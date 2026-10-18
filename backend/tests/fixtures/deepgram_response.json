@@ -1,0 +1,160 @@
+{
+  "metadata": {
+    "request_id": "test-request-id",
+    "duration": 10.0535
+  },
+  "results": {
+    "channels": [
+      {
+        "alternatives": [
+          {
+            "transcript": "So, uh, I think the main point is that, um, practice really matters. Uh, you know, it helps a lot.",
+            "confidence": 0.9980469,
+            "words": [
+              {
+                "word": "so",
+                "start": 0.0,
+                "end": 1.44,
+                "confidence": 0.7873535,
+                "punctuated_word": "So,"
+              },
+              {
+                "word": "uh",
+                "start": 1.52,
+                "end": 2.0,
+                "confidence": 0.7614746,
+                "punctuated_word": "uh,"
+              },
+              {
+                "word": "i",
+                "start": 2.0,
+                "end": 2.32,
+                "confidence": 0.9980469,
+                "punctuated_word": "I"
+              },
+              {
+                "word": "think",
+                "start": 2.32,
+                "end": 2.56,
+                "confidence": 1.0,
+                "punctuated_word": "think"
+              },
+              {
+                "word": "the",
+                "start": 2.56,
+                "end": 2.72,
+                "confidence": 0.99902344,
+                "punctuated_word": "the"
+              },
+              {
+                "word": "main",
+                "start": 2.72,
+                "end": 2.96,
+                "confidence": 1.0,
+                "punctuated_word": "main"
+              },
+              {
+                "word": "point",
+                "start": 2.96,
+                "end": 3.1999998,
+                "confidence": 1.0,
+                "punctuated_word": "point"
+              },
+              {
+                "word": "is",
+                "start": 3.1999998,
+                "end": 3.4399998,
+                "confidence": 1.0,
+                "punctuated_word": "is"
+              },
+              {
+                "word": "that",
+                "start": 3.4399998,
+                "end": 3.9999998,
+                "confidence": 0.9650879,
+                "punctuated_word": "that,"
+              },
+              {
+                "word": "um",
+                "start": 4.08,
+                "end": 4.7200003,
+                "confidence": 0.9621582,
+                "punctuated_word": "um,"
+              },
+              {
+                "word": "practice",
+                "start": 4.7999997,
+                "end": 5.2799997,
+                "confidence": 0.9819336,
+                "punctuated_word": "practice"
+              },
+              {
+                "word": "really",
+                "start": 5.2799997,
+                "end": 5.68,
+                "confidence": 1.0,
+                "punctuated_word": "really"
+              },
+              {
+                "word": "matters",
+                "start": 5.68,
+                "end": 6.4,
+                "confidence": 0.99609375,
+                "punctuated_word": "matters."
+              },
+              {
+                "word": "uh",
+                "start": 6.96,
+                "end": 7.52,
+                "confidence": 0.98706055,
+                "punctuated_word": "Uh,"
+              },
+              {
+                "word": "you",
+                "start": 7.52,
+                "end": 7.8399997,
+                "confidence": 0.98291016,
+                "punctuated_word": "you"
+              },
+              {
+                "word": "know",
+                "start": 7.8399997,
+                "end": 8.4,
+                "confidence": 0.98217773,
+                "punctuated_word": "know,"
+              },
+              {
+                "word": "it",
+                "start": 8.4,
+                "end": 8.639999,
+                "confidence": 0.98828125,
+                "punctuated_word": "it"
+              },
+              {
+                "word": "helps",
+                "start": 8.639999,
+                "end": 8.96,
+                "confidence": 1.0,
+                "punctuated_word": "helps"
+              },
+              {
+                "word": "a",
+                "start": 8.96,
+                "end": 9.12,
+                "confidence": 1.0,
+                "punctuated_word": "a"
+              },
+              {
+                "word": "lot",
+                "start": 9.12,
+                "end": 9.28,
+                "confidence": 0.9980469,
+                "punctuated_word": "lot."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
