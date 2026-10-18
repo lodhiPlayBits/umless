@@ -17,4 +17,4 @@ dist/
 backend/data/
 
 # Phase 0 spike: recordings of the user's voice and raw Deepgram output
-spike/
+/spike/
