@@ -30,7 +30,7 @@ class FailingTranscriber:
 def make_client(transcriber, settings=None):
     app = create_app(settings or Settings(transcriber="fake"))
     app.dependency_overrides[get_transcriber] = lambda: transcriber
-    return TestClient(app)
+    return TestClient(app, base_url="http://localhost")
 
 
 def post(client, body=AUDIO, content_type="audio/webm"):
@@ -157,7 +157,8 @@ def test_transcription_error_returns_502_without_leaking_key():
 @pytest.mark.parametrize("key", [None, ""])
 def test_deepgram_without_api_key_returns_503(key):
     client = TestClient(
-        create_app(Settings(transcriber="deepgram", deepgram_api_key=key))
+        create_app(Settings(transcriber="deepgram", deepgram_api_key=key)),
+        base_url="http://localhost",
     )
     response = post(client)
 
@@ -172,3 +173,57 @@ def test_fake_transcriber_without_override_returns_um_text(client):
 
     assert response.status_code == 200
     assert "um" in response.json()["text"]
+
+
+def test_empty_body_uses_empty_audio_error_body():
+    response = post(make_client(RecordingTranscriber()), body=b"")
+
+    assert response.status_code == 400
+    assert response.json() == {"code": "empty_audio", "detail": "The recording is empty."}
+
+
+def test_body_over_limit_uses_audio_too_large_error_body():
+    client = make_client(
+        RecordingTranscriber(), Settings(transcriber="fake", max_body_bytes=1024)
+    )
+    response = post(client, body=b"a" * 2000)
+
+    assert response.status_code == 413
+    assert response.json() == {
+        "code": "audio_too_large",
+        "detail": "The recording is larger than 25 MB.",
+    }
+
+
+def test_unsupported_type_uses_unsupported_audio_type_error_body():
+    response = post(make_client(RecordingTranscriber()), content_type="text/plain")
+
+    assert response.status_code == 415
+    assert response.json() == {
+        "code": "unsupported_audio_type",
+        "detail": "Unsupported audio type. Send audio/webm, audio/ogg, audio/mp4, audio/wav or audio/mpeg.",
+    }
+
+
+def test_transcription_error_uses_transcription_failed_error_body():
+    response = post(make_client(FailingTranscriber()))
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "code": "transcription_failed",
+        "detail": "Transcription failed. Try again in a moment.",
+    }
+
+
+def test_missing_api_key_uses_transcription_unavailable_error_body():
+    client = TestClient(
+        create_app(Settings(transcriber="deepgram", deepgram_api_key=None)),
+        base_url="http://localhost",
+    )
+    response = post(client)
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "code": "transcription_unavailable",
+        "detail": "Transcription is unavailable because DEEPGRAM_API_KEY is not set.",
+    }

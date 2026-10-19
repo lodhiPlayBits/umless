@@ -20,5 +20,7 @@ def anyio_backend():
 
 
 @pytest.fixture
-def client():
-    return TestClient(create_app(Settings(transcriber="fake")))
+def client(tmp_path):
+    app = create_app(Settings(transcriber="fake", data_file=tmp_path / "q.json"))
+    with TestClient(app, base_url="http://localhost") as c:
+        yield c

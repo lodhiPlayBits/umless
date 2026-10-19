@@ -23,7 +23,7 @@ class RecordingTranscriber:
 def make_client(transcriber, settings=None):
     app = create_app(settings or Settings(transcriber="fake"))
     app.dependency_overrides[get_transcriber] = lambda: transcriber
-    return TestClient(app)
+    return TestClient(app, base_url="http://localhost")
 
 
 @pytest.mark.anyio

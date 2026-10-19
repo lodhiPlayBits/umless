@@ -11,6 +11,7 @@ FastAPI backend in `backend/`, React (Vite + TypeScript) frontend in `frontend/`
    DEEPGRAM_API_KEY=your-key
    ```
    Set `UMLESS_TRANSCRIBER=fake` instead to run without a key (canned transcript, no cost).
+   Questions are saved to `backend/data/questions.json`; set `UMLESS_DATA_FILE` to use another file.
 2. Backend (Windows PowerShell):
    ```powershell
    cd backend

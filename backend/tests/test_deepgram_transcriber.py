@@ -182,3 +182,27 @@ def test_settings_from_env_defaults_to_deepgram(monkeypatch):
     s = Settings.from_env()
 
     assert s.transcriber == "deepgram"
+
+
+def test_data_file_defaults_to_backend_data_questions_json(monkeypatch):
+    from app.config import BACKEND_DIR
+
+    monkeypatch.delenv("UMLESS_DATA_FILE", raising=False)
+
+    assert Settings.from_env(env_files=()).data_file == BACKEND_DIR / "data" / "questions.json"
+
+
+def test_absolute_data_file_env_is_used_as_given(monkeypatch, tmp_path):
+    target = tmp_path / "elsewhere.json"
+    monkeypatch.setenv("UMLESS_DATA_FILE", str(target))
+
+    assert Settings.from_env(env_files=()).data_file == target
+
+
+def test_relative_data_file_env_resolves_against_backend_dir_not_cwd(monkeypatch, tmp_path):
+    from app.config import BACKEND_DIR
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("UMLESS_DATA_FILE", "rel/q.json")
+
+    assert Settings.from_env(env_files=()).data_file == BACKEND_DIR / "rel" / "q.json"
