@@ -35,8 +35,8 @@ umless is a speech practice web app for individuals rehearsing on their own: job
 | 2 | Docs + API contract | /kit:contract | approved | 2026-10-19 | prd, data-model, ADR 0001, openapi.yaml (6 ops, Redocly lint clean); plan-critic: PROCEED WITH CHANGES, blocking item applied |
 | 3 | Backend | /kit:feature (per endpoint group) | approved | 2026-10-19 | platform, questions, transcriptions done; 329 passed, 1 skipped; each group code- and security-reviewed |
 | 4 | API testing | /kit:api-test | approved | 2026-10-19 | Schemathesis contract tests green (28 explicit + 6 fuzz); live CLI run 547/547; security LOW |
-| 5 | Frontend | /kit:frontend | awaiting-approval | 2026-10-19 | all 10 screens done and browser-checked; 188 unit + 82 e2e passing; code review blocking item fixed |
-| 6 | Ship | /kit:ship | not-started | | |
+| 5 | Frontend | /kit:frontend | approved | 2026-10-19 | all 10 screens done and browser-checked; 188 unit + 82 e2e passing; code review blocking item fixed |
+| 6 | Ship | /kit:ship | in-progress | 2026-10-19 | shipping |
 
 Phase status values: not-started, in-progress, awaiting-approval, approved, blocked.
 Row status values (endpoint groups, frontend screens): not-started, in-progress, done.
@@ -88,3 +88,4 @@ Row status values (endpoint groups, frontend screens): not-started, in-progress,
 - 2026-10-19: Practice screens follow the wireframe where flows.md wording differs (E2, E3, E10 messages); the countdown switches at 9:00 showing "Time left 1:00"; Transcribe is hidden (not just disabled) while transcribing. Recorder errors now carry a kind (denied / no-mic / unsupported / failed) and auto-stop a reason (limit / device-lost). The old prototype (PracticeScreen.tsx, api.ts and their tests) is no longer routed; removal waits for the user's OK.
 - 2026-10-19: Leave-without-saving asks only while nothing from the take has been downloaded (flows F4.6/F4.8); the wireframe note said "unless both files were downloaded". The old practice prototype (PracticeScreen.tsx, api.ts and their tests) was removed with the user's OK; transcription is covered by the new practice tests.
 - 2026-10-19: Phase 5 code review (REQUEST CHANGES, 1 blocking): an auto-stop while "Stop and discard?" was open left the dialog up and Discard dropped the take without the unsaved-take question; fixed with a regression test. Also fixed: no Try again for 415 / invalid_host, transcript region role, IME Enter in edit, stale list loads. Not fixed (listed for the user): blocked Back re-pushes history instead of history.go, dev-only object-URL leak under StrictMode, a few hard-coded CSS sizes, limit notice lost if Stop races the auto-stop.
+- 2026-10-19: Phase 5 approved by the user.

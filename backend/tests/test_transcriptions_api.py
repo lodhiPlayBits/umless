@@ -257,6 +257,16 @@ def test_transcription_error_uses_transcription_failed_error_body():
     }
 
 
+def test_transcription_error_is_logged_without_the_key(caplog):
+    with caplog.at_level("WARNING"):
+        response = post(make_client(FailingTranscriber()))
+
+    assert response.status_code == 502
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert any("upstream failed" in r.getMessage() for r in warnings)
+    assert all(SECRET not in r.getMessage() for r in caplog.records)
+
+
 def test_missing_api_key_uses_transcription_unavailable_error_body():
     client = TestClient(
         create_app(Settings(transcriber="deepgram", deepgram_api_key=None)),

@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
@@ -13,6 +14,8 @@ from app.transcription import (
     Transcriber,
     TranscriptionError,
 )
+
+logger = logging.getLogger(__name__)
 
 ACCEPTED_AUDIO_TYPES = {"audio/webm", "audio/ogg", "audio/mp4", "audio/wav", "audio/mpeg"}
 
@@ -96,7 +99,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             transcript = await transcriber.transcribe(audio, content_type)
             # OverflowError: Deepgram's timings make the summary rates infinite.
             return transcript_body(transcript)
-        except (TranscriptionError, OverflowError):
+        except (TranscriptionError, OverflowError) as exc:
+            # The user only sees "try again"; the cause (e.g. a revoked key, HTTP 401) goes to the
+            # log. TranscriptionError messages never contain the API key.
+            logger.warning("Transcription failed: %s", exc)
             raise ApiError(
                 502, "transcription_failed", "Transcription failed. Try again in a moment."
             ) from None

@@ -46,6 +46,10 @@ describe('summaryRows', () => {
     expect(value(summaryRows(make({ duration_seconds: null }), 65_000), 'Length')).toBe('1:05')
   })
 
+  it('falls back to the recorded length when duration_seconds is 0, like the server', () => {
+    expect(value(summaryRows(make({ duration_seconds: 0 }), 65_000), 'Length')).toBe('1:05')
+  })
+
   it('shows "—" for a null pace and a null fillers per minute', () => {
     const rows = summaryRows(make({}, { words_per_minute: null, fillers_per_minute: null }), 0)
     expect(value(rows, 'Pace')).toBe('—')

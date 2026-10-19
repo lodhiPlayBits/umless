@@ -15,11 +15,12 @@ function seconds(value: number): string {
 
 /**
  * The "How it went" rows (docs/design/flows.md F4.1). Values the server returns as null show
- * "—". Length falls back to the take's own duration when Deepgram doesn't report one.
+ * "—". Length falls back to the take's own duration when Deepgram reports none (null or 0).
  */
 export function summaryRows(transcript: Transcript, recordedMs: number): SummaryRow[] {
   const { summary } = transcript
-  const length = transcript.duration_seconds ?? recordedMs / 1000
+  // 0 means "not reported" too, as in the server's rate fallback (docs/data-model.md).
+  const length = transcript.duration_seconds || recordedMs / 1000
   const rows: SummaryRow[] = [
     { label: 'Length', value: formatClock(length * 1000) },
     { label: 'Pace', value: summary.words_per_minute === null ? '—' : `${summary.words_per_minute} wpm` },
