@@ -14,9 +14,21 @@ export const MIME_TYPE_PREFERENCE = [
   'audio/mp4',
 ]
 
+/** unsupported: no MediaRecorder or not a secure context (E3); denied: E1; no-mic: E2. */
+export type RecorderErrorKind = 'unsupported' | 'denied' | 'no-mic' | 'failed'
+
 export class RecorderError extends Error {
   name = 'RecorderError'
+  kind: RecorderErrorKind
+
+  constructor(message: string, kind: RecorderErrorKind = 'failed') {
+    super(message)
+    this.kind = kind
+  }
 }
+
+/** Why a recording ended without stop(): the time cap, or the browser ending the mic (E4). */
+export type AutoStopReason = 'limit' | 'device-lost'
 
 export interface Recording {
   blob: Blob
@@ -27,6 +39,16 @@ export interface Recording {
 export interface RecorderHandle {
   mimeType: string
   stop(): Promise<Recording>
+  /** Input level from 0 to 1 right now, or null when the browser can't measure it. */
+  level?(): number | null
+}
+
+export function isRecordingSupported(): boolean {
+  return (
+    globalThis.isSecureContext !== false &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof MediaRecorder !== 'undefined'
+  )
 }
 
 export function pickMimeType(
@@ -47,22 +69,53 @@ async function openMicrophone(): Promise<MediaStream> {
   } catch (error) {
     // DOMException is not an Error subclass in every environment, so read fields by shape.
     const { name, message } = (error ?? {}) as { name?: string; message?: string }
-    if (name === 'NotAllowedError') {
-      throw new RecorderError('Microphone access was denied')
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      throw new RecorderError('Microphone access was denied', 'denied')
+    }
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+      throw new RecorderError(`Could not start the microphone: ${message || 'no microphone was found'}`, 'no-mic')
     }
     throw new RecorderError(`Could not start the microphone${message ? `: ${message}` : ''}`)
   }
 }
 
+/** Reads the input level for the meter; a no-op where Web Audio isn't available (tests, old browsers). */
+function createLevelMeter(stream: MediaStream): { level: () => number | null; close: () => void } {
+  if (typeof AudioContext === 'undefined') return { level: () => null, close: () => {} }
+  try {
+    const context = new AudioContext()
+    const analyser = context.createAnalyser()
+    analyser.fftSize = 512
+    context.createMediaStreamSource(stream).connect(analyser)
+    const samples = new Uint8Array(analyser.fftSize)
+    return {
+      level: () => {
+        analyser.getByteTimeDomainData(samples)
+        let sum = 0
+        for (const sample of samples) sum += ((sample - 128) / 128) ** 2
+        // RMS of normal speech is around 0.05-0.3; scale so it fills the meter.
+        return Math.min(1, Math.sqrt(sum / samples.length) * 4)
+      },
+      close: () => void context.close().catch(() => {}),
+    }
+  } catch {
+    return { level: () => null, close: () => {} }
+  }
+}
+
 export async function startRecording(
-  options: { maxMs?: number; onAutoStop?: (recording: Recording) => void } = {},
+  options: { maxMs?: number; onAutoStop?: (recording: Recording, reason?: AutoStopReason) => void } = {},
 ): Promise<RecorderHandle> {
-  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-    throw new RecorderError('Recording is not supported in this browser')
+  if (!isRecordingSupported()) {
+    throw new RecorderError('Recording is not supported in this browser', 'unsupported')
   }
 
   const stream = await openMicrophone()
-  const releaseMicrophone = () => stream.getTracks().forEach((track) => track.stop())
+  const meter = createLevelMeter(stream)
+  const releaseMicrophone = () => {
+    meter.close()
+    stream.getTracks().forEach((track) => track.stop())
+  }
   const picked = pickMimeType()
   let recorder: MediaRecorder
   try {
@@ -75,6 +128,7 @@ export async function startRecording(
   const chunks: Blob[] = []
   const startedAt = Date.now()
   let stoppedByUser = false
+  let limitReached = false
   let resolveStopped!: (recording: Recording) => void
   const stopped = new Promise<Recording>((resolve) => (resolveStopped = resolve))
   let finished = false
@@ -87,7 +141,7 @@ export async function startRecording(
     const recording = { blob: new Blob(chunks, { type: mimeType }), mimeType, durationMs: Date.now() - startedAt }
     resolveStopped(recording)
     // Timer cap, or the browser stopping on its own (mic unplugged, permission revoked).
-    if (!stoppedByUser) options.onAutoStop?.(recording)
+    if (!stoppedByUser) options.onAutoStop?.(recording, limitReached ? 'limit' : 'device-lost')
   }
 
   recorder.ondataavailable = (event) => {
@@ -116,7 +170,10 @@ export async function startRecording(
     return stopped
   }
 
-  const autoStopTimer = setTimeout(requestStop, options.maxMs ?? MAX_RECORDING_MS)
+  const autoStopTimer = setTimeout(() => {
+    limitReached = true
+    requestStop()
+  }, options.maxMs ?? MAX_RECORDING_MS)
 
   try {
     recorder.start(1000)
@@ -125,5 +182,5 @@ export async function startRecording(
     releaseMicrophone()
     throw new RecorderError(`Could not start recording: ${(error as Error)?.message ?? error}`)
   }
-  return { mimeType, stop }
+  return { mimeType, stop, level: meter.level }
 }

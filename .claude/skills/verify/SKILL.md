@@ -14,5 +14,9 @@ Run every check below from the repo root in Git Bash and report each command wit
    `cd frontend && npm run lint`
 4. Frontend build (includes the TypeScript type check):
    `cd frontend && npm run build`
+5. End-to-end tests (Playwright starts its own backend on 8766 and dev server on 5175, with a fake transcriber and a temporary data file; no running servers needed):
+   `cd frontend && npm run e2e`
+6. API client is in sync with the contract:
+   `cd frontend && npm run gen:api && git diff --exit-code -- src/generated`
 
 If a step can't run (missing `node_modules` or `.venv`), say "not verified" for that step and why. Don't guess the result.

@@ -8,6 +8,8 @@ umless is a speech practice web app for individuals rehearsing on their own: job
 | Backend | Python 3.12 + FastAPI | already in `backend/`; speech-to-text via Deepgram nova-3 (`filler_words=true`) |
 | Database | none in v1 (questions in a JSON file behind a `QuestionRepository` interface) | later: SQLite + SQLAlchemy + Alembic |
 | Frontend | React 19 + TypeScript + Vite 6 | already in `frontend/` |
+| API client | openapi-typescript 7.13.0 (dev) + openapi-fetch 0.17.0 | types generated from docs/api/openapi.yaml; typed fetch |
+| Routing | small built-in router (History API), no dependency | routes `/`, `/practice/:id`, not-found |
 | Styling | plain CSS with custom properties from `docs/design/tokens.md` | no UI kit, no Tailwind |
 | API style | REST + OpenAPI 3.1 | contract lives in docs/api/openapi.yaml |
 | Backend test runner | pytest | |
@@ -23,8 +25,8 @@ umless is a speech practice web app for individuals rehearsing on their own: job
 | Manual API requests | `docs/api/requests.http` (VS Code REST Client / JetBrains HTTP Client) |
 | Frontend dev server | `cd frontend; npm run dev` (http://localhost:5173, proxies `/api` to 127.0.0.1:8000) |
 | Frontend tests | `cd frontend; npm test` (also `npm run build`, `npm run lint`) |
-| E2E tests | TBD |
-| Generate API client | TBD |
+| E2E tests | `cd frontend; npm run e2e` (Playwright starts its own backend on 8766 and Vite on 5175, fake transcriber, temp data file) |
+| Generate API client | `cd frontend; npm run gen:api` (openapi-typescript → `src/generated/openapi.d.ts`, never edited by hand) |
 
 ## Phases
 | # | Phase | Skill | Status | Date | Notes |
@@ -32,8 +34,8 @@ umless is a speech practice web app for individuals rehearsing on their own: job
 | 1 | UI/UX design | /kit:design | approved | 2026-10-19 | docs/design/: 23 screen states, flows with 24 edge cases, tokens, clickable wireframe |
 | 2 | Docs + API contract | /kit:contract | approved | 2026-10-19 | prd, data-model, ADR 0001, openapi.yaml (6 ops, Redocly lint clean); plan-critic: PROCEED WITH CHANGES, blocking item applied |
 | 3 | Backend | /kit:feature (per endpoint group) | approved | 2026-10-19 | platform, questions, transcriptions done; 329 passed, 1 skipped; each group code- and security-reviewed |
-| 4 | API testing | /kit:api-test | in-progress | 2026-10-19 | contract tests written (Schemathesis); 1 fuzz case waits on the AudioBody contract decision |
-| 5 | Frontend | /kit:frontend | not-started | | practice screen prototype exists (feat/practice-recorder) |
+| 4 | API testing | /kit:api-test | approved | 2026-10-19 | Schemathesis contract tests green (28 explicit + 6 fuzz); live CLI run 547/547; security LOW |
+| 5 | Frontend | /kit:frontend | in-progress | 2026-10-19 | flows F1–F3 done (screens 1–7, 61 e2e passing); next: result + leave-without-saving (F4) |
 | 6 | Ship | /kit:ship | not-started | | |
 
 Phase status values: not-started, in-progress, awaiting-approval, approved, blocked.
@@ -51,6 +53,16 @@ Row status values (endpoint groups, frontend screens): not-started, in-progress,
 <!-- Filled in phase 5. One row per screen in build order; lets phase 5 resume after /clear. -->
 | Screen | Route | Flow | Status | Browser-checked |
 |---|---|---|---|---|
+| Question list (loading, empty, error, filter) | `/` | F1 | done | yes: 375 px and 1280 px in Chromium (Playwright screenshots), no console errors |
+| Add / edit question (validation, duplicate, save error) | `/` | F1, F2 | done | yes: 375 px and 1280 px in Chromium (Playwright screenshots), no console errors |
+| Delete confirm + Undo toast | `/` | F2 | done | yes: 375 px and 1280 px in Chromium (Playwright screenshots), no console errors |
+| Practice ready (health banner, "2 of 5") | `/practice/:id` | F3 | done | yes: 375 px and 1280 px in Chromium with a fake mic (denied / no-mic / unsupported simulated, countdown via a fast-forwarded clock); "Allow microphone access" hint and empty take not shown in the browser (covered by unit tests) |
+| Mic states (permission, denied, no mic, unsupported) | `/practice/:id` | F3, E1–E3 | done | yes: 375 px and 1280 px in Chromium with a fake mic (denied / no-mic / unsupported simulated, countdown via a fast-forwarded clock); "Allow microphone access" hint and empty take not shown in the browser (covered by unit tests) |
+| Recording + countdown + leave-while-recording | `/practice/:id` | F3, E15 | done | yes: 375 px and 1280 px in Chromium with a fake mic (denied / no-mic / unsupported simulated, countdown via a fast-forwarded clock); "Allow microphone access" hint and empty take not shown in the browser (covered by unit tests) |
+| Review, empty, transcribing, transcribe error | `/practice/:id` | F3, E4–E11 | done | yes: 375 px and 1280 px in Chromium with a fake mic (denied / no-mic / unsupported simulated, countdown via a fast-forwarded clock); "Allow microphone access" hint and empty take not shown in the browser (covered by unit tests) |
+| Result (summary, transcript, downloads, copy) + empty result | `/practice/:id` | F4, E12–E13 | not-started | |
+| Leave without saving (dialog + native prompt) | any | E14 | not-started | |
+| Not found | `*`, unknown id | E16 | not-started | |
 
 ## Decisions log
 <!-- One line per decision that changed the plan: date, decision, why. -->
@@ -69,3 +81,8 @@ Row status values (endpoint groups, frontend screens): not-started, in-progress,
 - 2026-10-19: Transcriptions group done. A per-minute rate that would be infinite (near-zero Deepgram duration) is a 502, like other unusable upstream data (security review). Not fixed (needs a hostile Deepgram response): words whose timings jump backwards can inflate the pause dots; confidence and timings accept numeric strings.
 - 2026-10-19: Phase 3 approved by the user. Live Deepgram check not run.
 - 2026-10-19: Phase 4: Schemathesis 4.32.1 added (dev-only, user OK); pytest bumped 8.3.5 -> 8.4.2 because Schemathesis needs >= 8.4. Fixed: 405 `Allow` header now lists every method on the path (found by fuzzing). Security review LOW: Vite dev server's default CORS lets other localhost origins call the API through :5173 (contradicts ADR 0001 Auth); not fixed in this phase.
+- 2026-10-19: Contract change (user chose option a): `AudioBody` loses `maxLength` (keeps `minLength: 1`); the 25 MB cap stays in its description and the documented 413. Schemathesis couldn't generate a body past the cap and flagged valid uploads; removing `minLength` too made it flag the documented 400 for an empty body. No behaviour change. Vite `server.cors: false` agreed for the start of phase 5.
+- 2026-10-19: Phase 4 approved by the user.
+- 2026-10-19: Phase 5 (user OK): openapi-typescript + openapi-fetch for the typed client, @playwright/test 1.64.1 for e2e, a small built-in router (no dependency). Vite `server.cors: false`. npm audit: 3 pre-existing vitest advisories (2 critical, dev-only), not fixed here.
+- 2026-10-19: Questions screens follow the wireframe where flows.md differs: the delete dialog says "Delete this question?" with "You can undo for a few seconds afterwards" (flows.md F2.3 says "This can't be undone", which contradicts the Undo toast); the too-long message is "Keep questions under 500 characters." with a "512 / 500" counter. Vite's /api proxy target is overridable with UMLESS_API_URL (used by e2e).
+- 2026-10-19: Practice screens follow the wireframe where flows.md wording differs (E2, E3, E10 messages); the countdown switches at 9:00 showing "Time left 1:00"; Transcribe is hidden (not just disabled) while transcribing. Recorder errors now carry a kind (denied / no-mic / unsupported / failed) and auto-stop a reason (limit / device-lost). The old prototype (PracticeScreen.tsx, api.ts and their tests) is no longer routed; removal waits for the user's OK.

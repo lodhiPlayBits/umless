@@ -436,8 +436,10 @@ components:
       type: string
       format: binary
       minLength: 1
-      maxLength: 26214400
-      description: Raw audio bytes, 1 byte to 25 MB.
+      description: |
+        Raw audio bytes, 1 byte to 25 MB (26,214,400 bytes). An empty body is a 400 `empty_audio`;
+        a larger one is a 413 `audio_too_large`. The 25 MB cap isn't a `maxLength` keyword because
+        test tools apply it to characters and can't generate a body that large.
 
     FillerWord:
       type: string

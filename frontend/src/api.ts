@@ -1,3 +1,7 @@
+import { ApiError } from './client'
+
+export { ApiError }
+
 export interface TranscriptWord {
   word: string
   start: number
@@ -9,16 +13,6 @@ export interface TranscriptResult {
   text: string
   words: TranscriptWord[]
   duration_seconds: number | null
-}
-
-export class ApiError extends Error {
-  name = 'ApiError'
-  status: number
-
-  constructor(message: string, status: number) {
-    super(message)
-    this.status = status
-  }
 }
 
 export async function transcribe(audio: Blob): Promise<TranscriptResult> {
