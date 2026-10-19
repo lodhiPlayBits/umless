@@ -131,5 +131,5 @@ The recording a user made in one attempt: an audio `Blob`, its MIME type (`audio
 
 | Field | Type | Constraints |
 |---|---|---|
-| `word` | string enum | `um`, `uh`, `mhmm`, `mm-mm`, `uh-uh`, `uh-huh`, `nuh-uh` (the set Deepgram emits with `filler_words=true`) |
+| `word` | string enum | `um`, `uh`, `mhmm`. Deepgram's other filler tokens (`uh-huh`, `uh-uh`, `mm-mm`, `nuh-uh`) are yes/no answers and count as ordinary words |
 | `count` | integer | ≥ 1 |

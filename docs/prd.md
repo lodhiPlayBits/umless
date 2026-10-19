@@ -77,7 +77,7 @@ Screen IDs refer to `docs/design/screens.md`; flow and edge-case numbers to `doc
 
 - [ ] The result shows the question, the summary, the transcript with fillers highlighted (amber and bold) and pause dots muted, and the player.
 - [ ] Summary values come from the response's `summary`: length (`duration_seconds`), words per minute, each filler with its count ("um ×4, uh ×2"), fillers per minute, long-pause count and longest pause. Values the server returns as `null` are shown as "—".
-- [ ] Fillers are the words Deepgram tags as fillers: um, uh, mhmm, mm-mm, uh-uh, uh-huh, nuh-uh. Three deliberate "um"s show as `um ×3`.
+- [ ] Fillers are um, uh and mhmm (Deepgram keeps them with `filler_words=true`); uh-huh, uh-uh, mm-mm and nuh-uh are yes/no answers and count as ordinary words. Three deliberate "um"s show as `um ×3`.
 - [ ] Download transcript saves `<slug>-<yyyymmdd>-<hhmmss>.txt`: question, blank line, transcript text, blank line, summary line. A slug with no Latin letters or digits falls back to `practice-<date>-<time>`.
 - [ ] Download audio saves the same base name with the recording's extension (`.webm`, `.ogg` or `.m4a`).
 - [ ] Copy transcript shows "Copied"; a blocked clipboard shows "Select and copy the text instead".

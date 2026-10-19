@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -21,6 +22,35 @@ class Transcript:
     text: str
     words: list[Word]
     duration_seconds: float | None
+
+
+MAX_TIMESTAMP_SECONDS = 24 * 60 * 60
+
+
+def _timestamp(value: object) -> float:
+    """A word timing in seconds; rejects non-finite or absurd values (they would overflow dots)."""
+    seconds = float(value)  # type: ignore[arg-type]
+    if not (math.isfinite(seconds) and 0 <= seconds <= MAX_TIMESTAMP_SECONDS):
+        raise ValueError(f"word timing out of range: {seconds}")
+    return seconds
+
+
+def text_with_pauses(words: list[dict]) -> str:
+    """Join Deepgram words, marking each pause of 1 s or more with one dot per full second.
+
+    Silence before the first and after the last word is not marked. A 1 ms tolerance keeps
+    float noise (e.g. 2.0000001 -> 3.0) from dropping a dot at exact second boundaries.
+    """
+    parts: list[str] = []
+    previous_end: float | None = None
+    for w in words:
+        if previous_end is not None:
+            dots = math.floor(_timestamp(w["start"]) - previous_end + 0.001)
+            if dots >= 1:
+                parts.append("." * dots)
+        parts.append(w.get("punctuated_word") or w["word"])
+        previous_end = _timestamp(w["end"])
+    return " ".join(parts)
 
 
 class TranscriptionError(Exception):
@@ -83,19 +113,20 @@ class DeepgramTranscriber:
         try:
             body = response.json()
             alternative = body["results"]["channels"][0]["alternatives"][0]
+            raw_words = alternative.get("words", [])
             words = [
                 Word(
                     word=w["word"],
-                    start=w["start"],
-                    end=w["end"],
-                    confidence=w["confidence"],
+                    start=_timestamp(w["start"]),
+                    end=_timestamp(w["end"]),
+                    confidence=float(w["confidence"]),
                 )
-                for w in alternative.get("words", [])
+                for w in raw_words
             ]
             return Transcript(
-                text=alternative["transcript"],
+                text=text_with_pauses(raw_words) if raw_words else alternative["transcript"],
                 words=words,
                 duration_seconds=(body.get("metadata") or {}).get("duration"),
             )
-        except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+        except (ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError):
             raise TranscriptionError("Deepgram returned an unexpected response") from None

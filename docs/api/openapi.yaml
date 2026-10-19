@@ -441,8 +441,10 @@ components:
 
     FillerWord:
       type: string
-      enum: [um, uh, mhmm, mm-mm, uh-uh, uh-huh, nuh-uh]
-      description: Filler words as Deepgram emits them with `filler_words=true`.
+      enum: [um, uh, mhmm]
+      description: |
+        Words counted as fillers (Deepgram emits them with `filler_words=true`). Deepgram's
+        uh-huh, uh-uh, mm-mm and nuh-uh are yes/no answers, so they count as ordinary words.
       example: um
 
     Word:
@@ -528,7 +530,7 @@ components:
         fillers:
           type: array
           description: One entry per filler that occurred, sorted by count (desc), then word (asc).
-          maxItems: 7
+          maxItems: 3
           items:
             $ref: '#/components/schemas/FillerCount'
         words_per_minute:
