@@ -1,0 +1,58 @@
+# umless API: one request per operation in docs/api/openapi.yaml.
+# Run them with VS Code REST Client or the JetBrains HTTP Client while the backend is running
+# (cd backend; .venv\Scripts\python run.py). There is no auth in v1, so there is no token.
+#
+# The server only accepts Host localhost or 127.0.0.1 (anything else gets 400 invalid_host).
+# To go through the frontend's dev proxy instead, use http://localhost:5173.
+# These requests change your real questions list (backend/data/questions.json); delete what
+# you add, or start the backend with UMLESS_DATA_FILE pointing at a scratch file.
+
+@baseUrl = http://127.0.0.1:8000
+
+### getHealth
+GET {{baseUrl}}/api/health
+
+### listQuestions
+GET {{baseUrl}}/api/questions
+
+### createQuestion (appends; the response's id is reused below)
+# @name createQuestion
+POST {{baseUrl}}/api/questions
+Content-Type: application/json
+
+{
+  "text": "Tell me about yourself"
+}
+
+### createQuestion with position (how Undo puts a deleted question back)
+POST {{baseUrl}}/api/questions
+Content-Type: application/json
+
+{
+  "text": "Why do you want this job?",
+  "position": 1
+}
+
+# VS Code REST Client fills this from the createQuestion response above.
+# In the JetBrains HTTP Client, paste an id from listQuestions instead.
+@questionId = {{createQuestion.response.body.$.id}}
+
+### updateQuestion
+PATCH {{baseUrl}}/api/questions/{{questionId}}
+Content-Type: application/json
+
+{
+  "text": "Tell me about yourself in two minutes"
+}
+
+### deleteQuestion
+DELETE {{baseUrl}}/api/questions/{{questionId}}
+
+### createTranscription
+# Sends a real recording to Deepgram (uses your key and credit) unless the backend runs with
+# UMLESS_TRANSCRIBER=fake. Put a short recording next to this file as sample.webm, or change
+# the path and the Content-Type (audio/ogg, audio/mp4, audio/wav or audio/mpeg).
+POST {{baseUrl}}/api/transcriptions
+Content-Type: audio/webm
+
+< ./sample.webm

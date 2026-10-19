@@ -5,9 +5,11 @@
 
 # Python
 .venv/
+.venv-wsl/
 __pycache__/
 *.pyc
 .pytest_cache/
+.schemathesis/
 
 # Node
 node_modules/

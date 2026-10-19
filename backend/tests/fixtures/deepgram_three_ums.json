@@ -1,0 +1,16 @@
+{
+  "metadata": {"request_id": "test-request-id", "duration": 5.0},
+  "results": {"channels": [{"alternatives": [{
+    "transcript": "Um, I think um, uh-huh, um, yes.",
+    "confidence": 0.99,
+    "words": [
+      {"word": "um", "start": 0.0, "end": 0.4, "confidence": 0.9, "punctuated_word": "Um,"},
+      {"word": "i", "start": 0.4, "end": 0.6, "confidence": 0.99, "punctuated_word": "I"},
+      {"word": "think", "start": 0.6, "end": 1.0, "confidence": 0.99, "punctuated_word": "think"},
+      {"word": "um", "start": 1.0, "end": 1.4, "confidence": 0.9, "punctuated_word": "um,"},
+      {"word": "uh-huh", "start": 1.4, "end": 2.0, "confidence": 0.9, "punctuated_word": "uh-huh,"},
+      {"word": "um", "start": 2.0, "end": 2.4, "confidence": 0.9, "punctuated_word": "um,"},
+      {"word": "yes", "start": 2.4, "end": 3.0, "confidence": 0.99, "punctuated_word": "yes."}
+    ]
+  }]}]}
+}

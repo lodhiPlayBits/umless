@@ -1,0 +1,702 @@
+openapi: 3.1.0
+info:
+  title: umless API
+  version: 1.0.0
+  summary: Local speech practice backend - questions and transcription.
+  description: |
+    Contract for umless v1 (see docs/prd.md and docs/adr/0001-architecture.md).
+    Local and single-user: the server binds to 127.0.0.1, accepts only localhost Host
+    headers, and has no authentication. Every non-2xx response uses the `Error` schema.
+    `x-screen` on each operation names the screen actions from docs/design/screens.md it serves.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://127.0.0.1:8000
+    description: Local backend (the Vite dev server proxies /api here)
+security: []
+tags:
+  - name: health
+    description: Server availability
+  - name: questions
+    description: The user's practice questions (persisted in a JSON file)
+  - name: transcriptions
+    description: Speech-to-text through Deepgram; nothing is stored
+
+paths:
+  /api/health:
+    get:
+      operationId: getHealth
+      tags: [health]
+      summary: Check that the server is running
+      description: |
+        Called when `practice-ready` loads. A failure (network error or non-200) shows the
+        banner "Server offline; you can record but not transcribe".
+      x-screen:
+        - practice-ready / health check on load
+      security: []
+      responses:
+        '200':
+          description: The server is up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/questions:
+    get:
+      operationId: listQuestions
+      tags: [questions]
+      summary: List all questions in their stored order
+      x-screen:
+        - questions / list questions (on load)
+        - questions-loading / list questions
+        - questions-error / retry loading questions
+        - questions / start practice
+        - questions-deleted / start practice
+        - practice-ready / load question by id from the list (direct URL, refresh), "2 of 5" position
+        - result / next question
+      description: |
+        Returns the whole list (no pagination in v1), oldest first unless Undo re-inserted a
+        question at an earlier position. The practice route also loads from this list: it finds
+        the question by id (missing → `not-found`), and uses its index for "2 of 5" and for
+        Next question, so one read serves the whole screen and can't disagree with itself.
+      security: []
+      responses:
+        '200':
+          description: All questions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionList'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createQuestion
+      tags: [questions]
+      summary: Create a question
+      description: |
+        Appends the question, or inserts it at `position` (used by Undo after a delete).
+        `text` is trimmed before it is stored. Duplicates are allowed; the client shows the
+        duplicate warning itself.
+      x-screen:
+        - questions / create question
+        - questions-empty / create question
+        - questions-empty / add suggested question
+        - questions-invalid / fix and create question, add anyway, retry save
+        - questions-deleted / undo delete (with position)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionCreate'
+            examples:
+              append:
+                summary: Add at the end
+                value:
+                  text: Tell me about yourself
+              undo:
+                summary: Undo a delete (re-insert at index 1)
+                value:
+                  text: Why do you want this job?
+                  position: 1
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Location:
+              description: URL of the new question.
+              required: true
+              schema:
+                type: string
+                example: /api/questions/3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/questions/{questionId}:
+    parameters:
+      - $ref: '#/components/parameters/QuestionId'
+    patch:
+      operationId: updateQuestion
+      tags: [questions]
+      summary: Change a question's text
+      description: |
+        `text` is trimmed before it is stored; `id`, `created_at` and position don't change.
+        404 shows the toast "This question was deleted" and reloads the list.
+      x-screen:
+        - questions / update question (Save in inline edit)
+        - questions-invalid / retry save (edit mode)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionUpdate'
+      responses:
+        '200':
+          description: The updated question.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          $ref: '#/components/responses/QuestionNotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteQuestion
+      tags: [questions]
+      summary: Delete a question
+      description: The client treats 404 as already deleted.
+      x-screen:
+        - delete-confirm / delete question
+      security: []
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/QuestionNotFound'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/transcriptions:
+    post:
+      operationId: createTranscription
+      tags: [transcriptions]
+      summary: Transcribe a recording, keeping fillers and marking pauses
+      description: |
+        The request body is the raw audio from MediaRecorder (no multipart). Media type
+        parameters such as `;codecs=opus` are allowed and ignored. Bodies over 25 MB
+        (26,214,400 bytes) are rejected with 413 without reading the rest. The audio is sent to
+        Deepgram nova-3 with `filler_words=true`, `smart_format=true`, `language=en` and
+        `mip_opt_out=true`, and is not stored. Silence returns 200 with empty `text` and
+        `words` (shown as `result-empty`).
+      x-screen:
+        - practice-review / transcribe recording
+        - practice-transcribe-error / retry transcription
+      security: []
+      requestBody:
+        required: true
+        content:
+          audio/webm:
+            schema:
+              $ref: '#/components/schemas/AudioBody'
+          audio/ogg:
+            schema:
+              $ref: '#/components/schemas/AudioBody'
+          audio/mp4:
+            schema:
+              $ref: '#/components/schemas/AudioBody'
+          audio/wav:
+            schema:
+              $ref: '#/components/schemas/AudioBody'
+          audio/mpeg:
+            schema:
+              $ref: '#/components/schemas/AudioBody'
+      responses:
+        '200':
+          description: The transcript with filler flags, pauses and a summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transcript'
+        '400':
+          description: |
+            The body was empty (`empty_audio`, shown as `practice-empty`), or the Host header is
+            not localhost/127.0.0.1 (`invalid_host`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: empty_audio
+                detail: The recording is empty.
+        '413':
+          description: The body is larger than 25 MB.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: audio_too_large
+                detail: The recording is larger than 25 MB.
+        '415':
+          description: The Content-Type is missing or not one of the accepted audio types.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: unsupported_audio_type
+                detail: Unsupported audio type. Send audio/webm, audio/ogg, audio/mp4, audio/wav or audio/mpeg.
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          description: Deepgram failed, timed out, or returned something unusable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: transcription_failed
+                detail: Transcription failed. Try again in a moment.
+        '503':
+          description: The server has no DEEPGRAM_API_KEY (and is not in fake mode).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: transcription_unavailable
+                detail: Transcription is unavailable because DEEPGRAM_API_KEY is not set.
+
+components:
+  parameters:
+    QuestionId:
+      name: questionId
+      in: path
+      required: true
+      description: The question's UUID. Anything that is not an existing id (malformed included) returns 404.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        example: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
+
+  responses:
+    InvalidHost:
+      description: The Host header is not localhost or 127.0.0.1 (DNS-rebinding guard).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: invalid_host
+            detail: Invalid Host header.
+    QuestionNotFound:
+      description: No question has this id (deleted, unknown or malformed).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: question_not_found
+            detail: That question doesn't exist any more.
+    ValidationError:
+      description: The request body failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: validation_error
+            detail: Question text must be 500 characters or fewer.
+            fields:
+              - field: text
+                message: Must be 500 characters or fewer (512 now).
+    UnsupportedMediaType:
+      description: The request body is not `application/json`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: unsupported_media_type
+            detail: Send the request body as application/json.
+    InternalError:
+      description: Unexpected server error. No internal details are included.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: internal_error
+            detail: Something went wrong on the server.
+
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+      example:
+        status: ok
+
+    Question:
+      type: object
+      additionalProperties: false
+      required: [id, text, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Server-assigned UUID v4.
+        text:
+          type: string
+          minLength: 1
+          maxLength: 500
+          pattern: '\S'
+          description: Trimmed; 1-500 Unicode code points.
+        created_at:
+          type: string
+          format: date-time
+          description: UTC, RFC 3339 with a `Z` suffix.
+      example:
+        id: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
+        text: Tell me about yourself
+        created_at: '2026-10-19T10:15:02Z'
+
+    QuestionList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: Every question, in stored order.
+          items:
+            $ref: '#/components/schemas/Question'
+      example:
+        items:
+          - id: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
+            text: Tell me about yourself
+            created_at: '2026-10-19T10:15:02Z'
+          - id: 9b1e4d2a-77c3-4f8e-b0a6-5c3d2e1f0a98
+            text: Why do you want this job?
+            created_at: '2026-10-19T10:16:40Z'
+
+    QuestionText:
+      type: string
+      minLength: 1
+      maxLength: 500
+      pattern: '\S'
+      description: |
+        At most 500 Unicode code points and at least one non-whitespace character. Leading and
+        trailing whitespace is removed before storing; text that is empty after trimming is a 422.
+      example: Tell me about yourself
+
+    QuestionCreate:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text:
+          $ref: '#/components/schemas/QuestionText'
+        position:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          description: |
+            0-based index to insert at; values past the end append. Omit to append. Used by Undo
+            to put a deleted question back where it was.
+      example:
+        text: Tell me about yourself
+
+    QuestionUpdate:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text:
+          $ref: '#/components/schemas/QuestionText'
+      example:
+        text: Tell me about yourself in two minutes
+
+    AudioBody:
+      type: string
+      format: binary
+      minLength: 1
+      description: |
+        Raw audio bytes, 1 byte to 25 MB (26,214,400 bytes). An empty body is a 400 `empty_audio`;
+        a larger one is a 413 `audio_too_large`. The 25 MB cap isn't a `maxLength` keyword because
+        test tools apply it to characters and can't generate a body that large.
+
+    FillerWord:
+      type: string
+      enum: [um, uh, mhmm]
+      description: |
+        Words counted as fillers (Deepgram emits them with `filler_words=true`). Deepgram's
+        uh-huh, uh-uh, mm-mm and nuh-uh are yes/no answers, so they count as ordinary words.
+      example: um
+
+    Word:
+      type: object
+      additionalProperties: false
+      required: [word, punctuated_word, start, end, confidence, is_filler, pause_before_seconds]
+      properties:
+        word:
+          type: string
+          minLength: 1
+          description: Lowercase, unpunctuated form from Deepgram.
+        punctuated_word:
+          type: string
+          minLength: 1
+          description: Display form with case and punctuation; equals `word` when Deepgram gives none.
+        start:
+          type: number
+          minimum: 0
+          maximum: 86400
+          description: Seconds from the start of the audio.
+        end:
+          type: number
+          minimum: 0
+          maximum: 86400
+          description: Seconds from the start of the audio; >= start.
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        is_filler:
+          type: boolean
+          description: True when `word` is a FillerWord.
+        pause_before_seconds:
+          type: number
+          minimum: 0
+          maximum: 86400
+          description: |
+            Silence between the previous word's end and this word's start, floored at 0 and rounded
+            to 0.01 s for display; 0 for the first word. Dots and the pause counts use the raw gap,
+            not this rounded value: a raw gap g gives floor(g + 0.001) dots before this word.
+      example:
+        word: um
+        punctuated_word: um,
+        start: 2.4
+        end: 2.7
+        confidence: 0.95
+        is_filler: true
+        pause_before_seconds: 1.6
+
+    FillerCount:
+      type: object
+      additionalProperties: false
+      required: [word, count]
+      properties:
+        word:
+          $ref: '#/components/schemas/FillerWord'
+        count:
+          type: integer
+          minimum: 1
+      example:
+        word: um
+        count: 4
+
+    TranscriptSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - word_count
+        - filler_count
+        - fillers
+        - words_per_minute
+        - fillers_per_minute
+        - pause_count
+        - longest_pause_seconds
+      properties:
+        word_count:
+          type: integer
+          minimum: 0
+          description: Words that are not fillers.
+        filler_count:
+          type: integer
+          minimum: 0
+        fillers:
+          type: array
+          description: One entry per filler that occurred, sorted by count (desc), then word (asc).
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/FillerCount'
+        words_per_minute:
+          type: [number, 'null']
+          minimum: 0
+          description: |
+            word_count per minute, whole number. Minutes come from duration_seconds, or from the last
+            word's end when duration_seconds is null or 0; null if neither is above 0.
+        fillers_per_minute:
+          type: [number, 'null']
+          minimum: 0
+          description: filler_count per minute, rounded to 0.1; same basis and null rule as words_per_minute.
+        pause_count:
+          type: integer
+          minimum: 0
+          description: Gaps between words that give at least one dot (raw gap g with floor(g + 0.001) >= 1).
+        longest_pause_seconds:
+          type: [number, 'null']
+          minimum: 1
+          maximum: 86400
+          description: Longest such raw gap, rounded to 0.1; null when pause_count is 0.
+      example:
+        word_count: 212
+        filler_count: 6
+        fillers:
+          - word: um
+            count: 4
+          - word: uh
+            count: 2
+        words_per_minute: 128
+        fillers_per_minute: 3.6
+        pause_count: 3
+        longest_pause_seconds: 4.2
+
+    Transcript:
+      type: object
+      additionalProperties: false
+      required: [text, words, duration_seconds, summary]
+      properties:
+        text:
+          type: string
+          description: |
+            Punctuated words joined by spaces, with N dots between two words separated by N full
+            seconds of silence. Empty when no speech was detected.
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/Word'
+        duration_seconds:
+          type: [number, 'null']
+          minimum: 0
+          description: Audio length reported by Deepgram; null if not reported.
+        summary:
+          $ref: '#/components/schemas/TranscriptSummary'
+      example:
+        text: So, .. um, I led the migration.
+        words:
+          - word: so
+            punctuated_word: So,
+            start: 0.1
+            end: 0.4
+            confidence: 0.99
+            is_filler: false
+            pause_before_seconds: 0
+          - word: um
+            punctuated_word: um,
+            start: 2.6
+            end: 2.9
+            confidence: 0.95
+            is_filler: true
+            pause_before_seconds: 2.2
+          - word: i
+            punctuated_word: I
+            start: 3.0
+            end: 3.1
+            confidence: 0.98
+            is_filler: false
+            pause_before_seconds: 0.1
+          - word: led
+            punctuated_word: led
+            start: 3.1
+            end: 3.3
+            confidence: 0.97
+            is_filler: false
+            pause_before_seconds: 0
+          - word: the
+            punctuated_word: the
+            start: 3.3
+            end: 3.4
+            confidence: 0.99
+            is_filler: false
+            pause_before_seconds: 0
+          - word: migration
+            punctuated_word: migration.
+            start: 3.4
+            end: 4.0
+            confidence: 0.96
+            is_filler: false
+            pause_before_seconds: 0
+        duration_seconds: 4.5
+        summary:
+          word_count: 5
+          filler_count: 1
+          fillers:
+            - word: um
+              count: 1
+          words_per_minute: 67
+          fillers_per_minute: 13.3
+          pause_count: 1
+          longest_pause_seconds: 2.2
+
+    ErrorCode:
+      type: string
+      enum:
+        - validation_error
+        - unsupported_media_type
+        - question_not_found
+        - not_found
+        - method_not_allowed
+        - empty_audio
+        - audio_too_large
+        - unsupported_audio_type
+        - transcription_failed
+        - transcription_unavailable
+        - invalid_host
+        - internal_error
+      description: |
+        Stable machine-readable code. `not_found` and `method_not_allowed` are for unknown
+        routes and wrong methods; the rest map to the documented responses.
+      example: validation_error
+
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          minLength: 1
+          description: Dotted path of the invalid input (`text`, `position`, `body`).
+        message:
+          type: string
+          minLength: 1
+      example:
+        field: text
+        message: Must be 500 characters or fewer (512 now).
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, detail]
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        detail:
+          type: string
+          minLength: 1
+          description: One human-readable sentence. Never contains stack traces, paths or secrets.
+        fields:
+          type: array
+          minItems: 1
+          description: Present only when code is `validation_error`.
+          items:
+            $ref: '#/components/schemas/FieldError'
+      example:
+        code: question_not_found
+        detail: That question doesn't exist any more.

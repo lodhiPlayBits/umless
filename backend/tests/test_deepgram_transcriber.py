@@ -60,6 +60,98 @@ def test_filler_words_param_is_requested():
 
 
 @pytest.mark.anyio
+async def test_mip_opt_out_param_is_requested():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json=fixture_body())
+
+    await make(handler).transcribe(AUDIO, "audio/wav")
+
+    (req,) = seen
+    assert parse_qs(req.url.query.decode())["mip_opt_out"] == ["true"]
+
+
+def raw_body(words, **metadata):
+    return {
+        "metadata": metadata,
+        "results": {"channels": [{"alternatives": [{"transcript": "x", "words": words}]}]},
+    }
+
+
+def good_word(**overrides):
+    word = {"word": "a", "punctuated_word": "A", "start": 0.0, "end": 0.5, "confidence": 0.9}
+    word.update(overrides)
+    return word
+
+
+async def transcribe_raw(body):
+    """Raw JSON content so NaN/Infinity (which httpx's json= refuses to encode) reach the parser."""
+    content = json.dumps(body).encode()
+    return await make(lambda request: httpx.Response(200, content=content)).transcribe(
+        AUDIO, "audio/wav"
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("extra", [{}, {"punctuated_word": ""}], ids=["missing", "empty"])
+async def test_punctuated_word_falls_back_to_word(extra):
+    word = good_word(word="hello", **extra)
+    if not extra:
+        del word["punctuated_word"]
+
+    result = await transcribe_raw(raw_body([word], duration=1.0))
+
+    assert result.words[0].punctuated_word == "hello"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"start": 2.0, "end": 1.0},
+        {"confidence": -0.1},
+        {"confidence": 1.1},
+        {"confidence": float("nan")},
+        {"word": "", "punctuated_word": "x"},
+        {"word": 123, "punctuated_word": "x"},
+    ],
+    ids=["end-before-start", "confidence-negative", "confidence-above-1", "confidence-nan",
+         "empty-word", "non-string-word"],
+)
+async def test_rejects_words_the_contract_forbids(overrides):
+    with pytest.raises(TranscriptionError):
+        await transcribe_raw(raw_body([good_word(**overrides)], duration=1.0))
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "duration",
+    ["abc", "3.5", True, -1.0, float("nan"), float("inf"), float("-inf")],
+    ids=["string", "numeric-string", "bool", "negative", "nan", "inf", "-inf"],
+)
+async def test_rejects_unusable_duration(duration):
+    with pytest.raises(TranscriptionError):
+        await transcribe_raw(raw_body([good_word()], duration=duration))
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("metadata", [{}, {"duration": None}], ids=["missing", "null"])
+async def test_missing_or_null_duration_stays_none(metadata):
+    result = await transcribe_raw(raw_body([good_word()], **metadata))
+
+    assert result.duration_seconds is None
+
+
+@pytest.mark.anyio
+async def test_very_large_finite_duration_is_accepted():
+    result = await transcribe_raw(raw_body([good_word()], duration=200000))
+
+    assert result.duration_seconds == 200000
+
+
+@pytest.mark.anyio
 async def test_parses_fixture_into_transcript():
     expected = fixture_body()
     alt = expected["results"]["channels"][0]["alternatives"][0]
@@ -72,7 +164,13 @@ async def test_parses_fixture_into_transcript():
     assert result.duration_seconds == pytest.approx(10.0535)
     assert len(result.words) > 0
     assert result.words == [
-        Word(word=w["word"], start=w["start"], end=w["end"], confidence=w["confidence"])
+        Word(
+            word=w["word"],
+            punctuated_word=w["punctuated_word"],
+            start=w["start"],
+            end=w["end"],
+            confidence=w["confidence"],
+        )
         for w in alt["words"]
     ]
 
@@ -182,3 +280,27 @@ def test_settings_from_env_defaults_to_deepgram(monkeypatch):
     s = Settings.from_env()
 
     assert s.transcriber == "deepgram"
+
+
+def test_data_file_defaults_to_backend_data_questions_json(monkeypatch):
+    from app.config import BACKEND_DIR
+
+    monkeypatch.delenv("UMLESS_DATA_FILE", raising=False)
+
+    assert Settings.from_env(env_files=()).data_file == BACKEND_DIR / "data" / "questions.json"
+
+
+def test_absolute_data_file_env_is_used_as_given(monkeypatch, tmp_path):
+    target = tmp_path / "elsewhere.json"
+    monkeypatch.setenv("UMLESS_DATA_FILE", str(target))
+
+    assert Settings.from_env(env_files=()).data_file == target
+
+
+def test_relative_data_file_env_resolves_against_backend_dir_not_cwd(monkeypatch, tmp_path):
+    from app.config import BACKEND_DIR
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("UMLESS_DATA_FILE", "rel/q.json")
+
+    assert Settings.from_env(env_files=()).data_file == BACKEND_DIR / "rel" / "q.json"
