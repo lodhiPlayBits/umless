@@ -16,7 +16,7 @@ class RecordingTranscriber:
 
     async def transcribe(self, audio, content_type):
         self.calls.append((audio, content_type))
-        return Transcript(text="um", words=[], duration_seconds=None)
+        return Transcript(words=[], duration_seconds=None)
 
 
 def make_client(transcriber=None):

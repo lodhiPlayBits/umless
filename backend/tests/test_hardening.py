@@ -17,7 +17,7 @@ class RecordingTranscriber:
 
     async def transcribe(self, audio, content_type):
         self.calls.append((audio, content_type))
-        return Transcript(text="um", words=[], duration_seconds=None)
+        return Transcript(words=[], duration_seconds=None)
 
 
 def make_client(transcriber, settings=None):
@@ -33,7 +33,8 @@ async def test_null_metadata_parses_with_no_duration():
 
     result = await DeepgramTranscriber("key", transport=transport).transcribe(AUDIO, "audio/wav")
 
-    assert result == Transcript(text="um", words=[], duration_seconds=None)
+    assert result == Transcript(words=[], duration_seconds=None)
+    assert result.text == ""
 
 
 @pytest.mark.anyio

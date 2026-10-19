@@ -113,7 +113,7 @@ The recording a user made in one attempt: an audio `Blob`, its MIME type (`audio
 | `start`, `end` | number (seconds) | 0 ≤ start ≤ end ≤ 86,400; out-of-range timings make the whole request a 502 |
 | `confidence` | number | 0–1 |
 | `is_filler` | boolean | `word` is in the filler set below |
-| `pause_before_seconds` | number | ≥ 0; this word's `start` minus the previous word's `end`, floored at 0; 0 for the first word; rounded to 0.01 s |
+| `pause_before_seconds` | number | ≥ 0; this word's `start` minus the previous word's `end`, floored at 0; 0 for the first word; rounded to 0.01 s. Display only: dots and pause counts use the raw gap |
 
 ### TranscriptSummary
 
@@ -122,10 +122,10 @@ The recording a user made in one attempt: an audio `Blob`, its MIME type (`audio
 | `word_count` | integer ≥ 0 | words with `is_filler = false` |
 | `filler_count` | integer ≥ 0 | words with `is_filler = true` |
 | `fillers` | array of FillerCount | one entry per filler that occurred; sorted by `count` descending, then `word` ascending |
-| `words_per_minute` | number or null | `word_count / (duration_seconds / 60)`, rounded to a whole number; null when `duration_seconds` is null or 0 |
-| `fillers_per_minute` | number or null | `filler_count / (duration_seconds / 60)`, rounded to 0.1; null under the same condition |
-| `pause_count` | integer ≥ 0 | words whose gap gives at least one dot: `floor(pause_before_seconds + 0.001) ≥ 1` (same rule as the dots) |
-| `longest_pause_seconds` | number or null | largest such gap, rounded to 0.1; null when `pause_count` is 0 |
+| `words_per_minute` | number or null | `word_count / (minutes)`, rounded to a whole number. Minutes come from `duration_seconds`, or from the last word's `end` when `duration_seconds` is null or 0 (`duration_seconds` itself is returned unchanged); null when neither is above 0 |
+| `fillers_per_minute` | number or null | `filler_count / (minutes)`, rounded to 0.1; same minutes and null rule as `words_per_minute` |
+| `pause_count` | integer ≥ 0 | words whose raw gap `g` (start minus previous end, unrounded) gives at least one dot: `floor(g + 0.001) ≥ 1`, the same rule that puts the dots in `text` |
+| `longest_pause_seconds` | number or null | largest such raw gap, rounded to 0.1; null when `pause_count` is 0 |
 
 ### FillerCount
 

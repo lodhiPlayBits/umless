@@ -482,9 +482,9 @@ components:
           minimum: 0
           maximum: 86400
           description: |
-            Silence between the previous word's end and this word's start, rounded to 0.01 s and
-            floored at 0; 0 for the first word. A value of N full seconds or more (N >= 1) is shown
-            as N dots before this word.
+            Silence between the previous word's end and this word's start, floored at 0 and rounded
+            to 0.01 s for display; 0 for the first word. Dots and the pause counts use the raw gap,
+            not this rounded value: a raw gap g gives floor(g + 0.001) dots before this word.
       example:
         word: um
         punctuated_word: um,
@@ -536,20 +536,22 @@ components:
         words_per_minute:
           type: [number, 'null']
           minimum: 0
-          description: word_count per minute of duration_seconds, whole number; null if duration is null or 0.
+          description: |
+            word_count per minute, whole number. Minutes come from duration_seconds, or from the last
+            word's end when duration_seconds is null or 0; null if neither is above 0.
         fillers_per_minute:
           type: [number, 'null']
           minimum: 0
-          description: filler_count per minute, rounded to 0.1; null if duration is null or 0.
+          description: filler_count per minute, rounded to 0.1; same basis and null rule as words_per_minute.
         pause_count:
           type: integer
           minimum: 0
-          description: Gaps between words that give at least one dot (1 s or more).
+          description: Gaps between words that give at least one dot (raw gap g with floor(g + 0.001) >= 1).
         longest_pause_seconds:
           type: [number, 'null']
           minimum: 1
           maximum: 86400
-          description: Longest such gap, rounded to 0.1; null when pause_count is 0.
+          description: Longest such raw gap, rounded to 0.1; null when pause_count is 0.
       example:
         word_count: 212
         filler_count: 6

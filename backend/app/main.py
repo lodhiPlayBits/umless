@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-from dataclasses import asdict
 
 from fastapi import Depends, FastAPI, Request
 
@@ -7,6 +6,7 @@ from app.config import Settings
 from app.errors import ApiError, LocalHostOnlyMiddleware, add_error_handlers
 from app.questions.repository import JsonFileQuestionRepository
 from app.questions.router import router as questions_router
+from app.summary import transcript_body
 from app.transcription import (
     DeepgramTranscriber,
     FakeTranscriber,
@@ -94,11 +94,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         try:
             transcript = await transcriber.transcribe(audio, content_type)
-        except TranscriptionError:
+            # OverflowError: Deepgram's timings make the summary rates infinite.
+            return transcript_body(transcript)
+        except (TranscriptionError, OverflowError):
             raise ApiError(
                 502, "transcription_failed", "Transcription failed. Try again in a moment."
             ) from None
-        return asdict(transcript)
 
     return app
 

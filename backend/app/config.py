@@ -16,6 +16,8 @@ DEEPGRAM_PARAMS = {
     "filler_words": "true",
     "smart_format": "true",
     "language": "en",
+    # Opt out of Deepgram's model improvement program: the audio isn't kept for training.
+    "mip_opt_out": "true",
 }
 
 

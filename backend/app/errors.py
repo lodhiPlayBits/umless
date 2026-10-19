@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import Match
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,15 @@ def _field_name(error: dict) -> str:
     return ".".join(loc) or "body"
 
 
+def _allowed_methods(request: Request) -> list[str]:
+    methods: set[str] = set()
+    for route in request.app.router.routes:
+        match, _ = route.matches(request.scope)
+        if match != Match.NONE:
+            methods |= getattr(route, "methods", None) or set()
+    return sorted(methods)
+
+
 async def _api_error(request: Request, exc: ApiError) -> JSONResponse:
     return error_response(exc.status_code, exc.code, exc.detail)
 
@@ -78,6 +88,9 @@ async def _http_error(request: Request, exc: StarletteHTTPException) -> JSONResp
     if exc.status_code == 404:
         return error_response(404, "not_found", "No endpoint matches this URL.", headers=headers)
     if exc.status_code == 405:
+        # Each FastAPI route has one method, so Starlette's Allow names only the route it
+        # matched; list every method the path supports instead.
+        headers = {**(headers or {}), "Allow": ", ".join(_allowed_methods(request))}
         return error_response(
             405, "method_not_allowed", "This method is not allowed for this URL.", headers=headers
         )

@@ -12,7 +12,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "deepgram_response.json"
 
 
 def W(punctuated, start, end):
-    return {"punctuated_word": punctuated, "start": start, "end": end}
+    return Word(word=punctuated, punctuated_word=punctuated, start=start, end=end, confidence=1.0)
 
 
 @pytest.mark.parametrize(
@@ -45,13 +45,26 @@ def test_text_with_pauses(words, expected):
 
 
 def test_falls_back_to_plain_word():
-    words = [{"word": "hello", "start": 0.0, "end": 0.5}, {"word": "world", "start": 2.0, "end": 2.5}]
+    words = [
+        Word(word="hello", punctuated_word="hello", start=0.0, end=0.5, confidence=1.0),
+        Word(word="world", punctuated_word="world", start=2.0, end=2.5, confidence=1.0),
+    ]
     assert text_with_pauses(words) == "hello . world"
 
 
 def test_real_fixture_without_long_pauses_is_unchanged():
     alt = json.loads(FIXTURE.read_text(encoding="utf-8"))["results"]["channels"][0]["alternatives"][0]
-    assert text_with_pauses(alt["words"]) == alt["transcript"]
+    words = [
+        Word(
+            word=w["word"],
+            punctuated_word=w["punctuated_word"],
+            start=w["start"],
+            end=w["end"],
+            confidence=w["confidence"],
+        )
+        for w in alt["words"]
+    ]
+    assert text_with_pauses(words) == alt["transcript"]
 
 
 def deepgram_body(transcript, words):
@@ -78,15 +91,18 @@ async def test_transcriber_text_shows_pauses_and_words_keep_their_shape():
 
     assert result.text == "So, .. um, yes."
     assert result.words == [
-        Word(word="so", start=0.0, end=0.5, confidence=0.9),
-        Word(word="um", start=2.6, end=3.0, confidence=0.8),
-        Word(word="yes", start=3.0, end=3.4, confidence=0.7),
+        Word(word="so", punctuated_word="So,", start=0.0, end=0.5, confidence=0.9),
+        Word(word="um", punctuated_word="um,", start=2.6, end=3.0, confidence=0.8),
+        Word(word="yes", punctuated_word="yes.", start=3.0, end=3.4, confidence=0.7),
     ]
 
 
 @pytest.mark.anyio
-async def test_transcriber_keeps_deepgram_text_when_there_are_no_words():
-    assert (await transcribe_body(deepgram_body("hi", []))).text == "hi"
+async def test_transcriber_text_is_empty_when_there_are_no_words():
+    result = await transcribe_body(deepgram_body("hi", []))
+
+    assert result.words == []
+    assert result.text == ""
 
 
 @pytest.mark.anyio
