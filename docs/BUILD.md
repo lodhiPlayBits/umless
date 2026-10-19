@@ -35,7 +35,7 @@ umless is a speech practice web app for individuals rehearsing on their own: job
 | 2 | Docs + API contract | /kit:contract | approved | 2026-10-19 | prd, data-model, ADR 0001, openapi.yaml (6 ops, Redocly lint clean); plan-critic: PROCEED WITH CHANGES, blocking item applied |
 | 3 | Backend | /kit:feature (per endpoint group) | approved | 2026-10-19 | platform, questions, transcriptions done; 329 passed, 1 skipped; each group code- and security-reviewed |
 | 4 | API testing | /kit:api-test | approved | 2026-10-19 | Schemathesis contract tests green (28 explicit + 6 fuzz); live CLI run 547/547; security LOW |
-| 5 | Frontend | /kit:frontend | in-progress | 2026-10-19 | flows F1–F3 done (screens 1–7, 61 e2e passing); next: result + leave-without-saving (F4) |
+| 5 | Frontend | /kit:frontend | awaiting-approval | 2026-10-19 | all 10 screens done and browser-checked; 188 unit + 82 e2e passing; code review blocking item fixed |
 | 6 | Ship | /kit:ship | not-started | | |
 
 Phase status values: not-started, in-progress, awaiting-approval, approved, blocked.
@@ -60,9 +60,9 @@ Row status values (endpoint groups, frontend screens): not-started, in-progress,
 | Mic states (permission, denied, no mic, unsupported) | `/practice/:id` | F3, E1–E3 | done | yes: 375 px and 1280 px in Chromium with a fake mic (denied / no-mic / unsupported simulated, countdown via a fast-forwarded clock); "Allow microphone access" hint and empty take not shown in the browser (covered by unit tests) |
 | Recording + countdown + leave-while-recording | `/practice/:id` | F3, E15 | done | yes: 375 px and 1280 px in Chromium with a fake mic (denied / no-mic / unsupported simulated, countdown via a fast-forwarded clock); "Allow microphone access" hint and empty take not shown in the browser (covered by unit tests) |
 | Review, empty, transcribing, transcribe error | `/practice/:id` | F3, E4–E11 | done | yes: 375 px and 1280 px in Chromium with a fake mic (denied / no-mic / unsupported simulated, countdown via a fast-forwarded clock); "Allow microphone access" hint and empty take not shown in the browser (covered by unit tests) |
-| Result (summary, transcript, downloads, copy) + empty result | `/practice/:id` | F4, E12–E13 | not-started | |
-| Leave without saving (dialog + native prompt) | any | E14 | not-started | |
-| Not found | `*`, unknown id | E16 | not-started | |
+| Result (summary, transcript, downloads, copy) + empty result | `/practice/:id` | F4, E12–E13 | done | yes: 375 px and 1280 px in Chromium; .txt contents, clipboard and empty result checked; no console errors |
+| Leave without saving (dialog + native prompt) | any | E14 | done | yes: dialog on Back link and Practise again, gone after a download; native "Leave site?" prompt not checked (headless Chromium) |
+| Not found | `*`, unknown id | E16 | done | yes: unknown URL at 1280 px and unknown question id at 375 px |
 
 ## Decisions log
 <!-- One line per decision that changed the plan: date, decision, why. -->
@@ -86,3 +86,5 @@ Row status values (endpoint groups, frontend screens): not-started, in-progress,
 - 2026-10-19: Phase 5 (user OK): openapi-typescript + openapi-fetch for the typed client, @playwright/test 1.64.1 for e2e, a small built-in router (no dependency). Vite `server.cors: false`. npm audit: 3 pre-existing vitest advisories (2 critical, dev-only), not fixed here.
 - 2026-10-19: Questions screens follow the wireframe where flows.md differs: the delete dialog says "Delete this question?" with "You can undo for a few seconds afterwards" (flows.md F2.3 says "This can't be undone", which contradicts the Undo toast); the too-long message is "Keep questions under 500 characters." with a "512 / 500" counter. Vite's /api proxy target is overridable with UMLESS_API_URL (used by e2e).
 - 2026-10-19: Practice screens follow the wireframe where flows.md wording differs (E2, E3, E10 messages); the countdown switches at 9:00 showing "Time left 1:00"; Transcribe is hidden (not just disabled) while transcribing. Recorder errors now carry a kind (denied / no-mic / unsupported / failed) and auto-stop a reason (limit / device-lost). The old prototype (PracticeScreen.tsx, api.ts and their tests) is no longer routed; removal waits for the user's OK.
+- 2026-10-19: Leave-without-saving asks only while nothing from the take has been downloaded (flows F4.6/F4.8); the wireframe note said "unless both files were downloaded". The old practice prototype (PracticeScreen.tsx, api.ts and their tests) was removed with the user's OK; transcription is covered by the new practice tests.
+- 2026-10-19: Phase 5 code review (REQUEST CHANGES, 1 blocking): an auto-stop while "Stop and discard?" was open left the dialog up and Discard dropped the take without the unsaved-take question; fixed with a regression test. Also fixed: no Try again for 415 / invalid_host, transcript region role, IME Enter in edit, stale list loads. Not fixed (listed for the user): blocked Back re-pushes history instead of history.go, dev-only object-URL leak under StrictMode, a few hard-coded CSS sizes, limit notice lost if Stop races the auto-stop.

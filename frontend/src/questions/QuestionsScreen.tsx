@@ -33,6 +33,7 @@ export default function QuestionsScreen() {
   const [pendingDelete, setPendingDelete] = useState<Question | null>(null)
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const toastCount = useRef(0)
+  const loadController = useRef<AbortController | null>(null)
 
   const showToast = useCallback((text: string, extra: Omit<ToastMessage, 'id' | 'text'> = {}) => {
     toastCount.current += 1
@@ -41,14 +42,20 @@ export default function QuestionsScreen() {
   const dismissToast = useCallback(() => setToast(null), [])
 
   const loadQuestions = useCallback(async () => {
+    // Only the latest load may update the screen (Retry clicked twice, a reload after a 404).
+    loadController.current?.abort()
     const controller = new AbortController()
+    loadController.current = controller
     setLoad({ status: 'loading', showSkeleton: false })
     const skeleton = window.setTimeout(() => setLoad((l) => (l.status === 'loading' ? { ...l, showSkeleton: true } : l)), SKELETON_DELAY_MS)
     const timeout = window.setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS)
     try {
-      setQuestions(await api.listQuestions(controller.signal))
+      const questions = await api.listQuestions(controller.signal)
+      if (loadController.current !== controller) return
+      setQuestions(questions)
       setLoad({ status: 'ready' })
     } catch (error) {
+      if (loadController.current !== controller) return
       setLoad({ status: 'error', error: error instanceof ApiError ? error : new ApiError(String(error), 0) })
     } finally {
       window.clearTimeout(skeleton)
@@ -58,6 +65,10 @@ export default function QuestionsScreen() {
 
   useEffect(() => {
     void loadQuestions()
+    return () => {
+      loadController.current?.abort()
+      loadController.current = null
+    }
   }, [loadQuestions])
 
   useEffect(() => {

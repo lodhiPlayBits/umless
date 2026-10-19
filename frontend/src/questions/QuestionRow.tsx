@@ -94,6 +94,8 @@ function EditingRow({ question, number, questions, onCancelEdit, onSave }: Quest
   }
 
   function handleKeyDown(event: KeyboardEvent) {
+    // Enter that confirms an IME composition (e.g. Japanese input) isn't a save.
+    if (event.nativeEvent.isComposing) return
     if (event.key === 'Enter') {
       event.preventDefault()
       void save()

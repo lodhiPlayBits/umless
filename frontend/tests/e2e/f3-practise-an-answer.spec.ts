@@ -426,3 +426,29 @@ test('E16 a deleted question id shows the not-found message', async ({ page, req
 
   await expect(page.getByText("That question doesn't exist any more")).toBeVisible()
 })
+
+// The fake transcriber accepts any body, so check the upload itself is the WebM recording.
+test('F3.7 Transcribe uploads the recorded audio as the raw request body', async ({ page, request }) => {
+  await resetQuestions(request)
+  const [question] = await seedQuestions(request, ['Tell me about yourself.'])
+  let upload: { contentType?: string; size: number; head: string } | undefined
+  await page.route('**/api/transcriptions', async (route) => {
+    const body = route.request().postDataBuffer()
+    upload = {
+      contentType: route.request().headers()['content-type'],
+      size: body?.length ?? 0,
+      head: body?.subarray(0, 4).toString('hex') ?? '',
+    }
+    await route.continue()
+  })
+  await page.goto(`/practice/${question.id}`)
+  await page.getByRole('button', { name: 'Start recording' }).click()
+  await page.waitForTimeout(1500)
+  await page.getByRole('button', { name: 'Stop recording' }).click()
+  await page.getByRole('button', { name: 'Transcribe' }).click()
+  await expect(page.getByText(/fake transcript/)).toBeVisible()
+
+  expect(upload?.contentType).toMatch(/^audio\/webm/)
+  expect(upload?.size).toBeGreaterThan(1000)
+  expect(upload?.head).toBe('1a45dfa3') // WebM/EBML signature
+})

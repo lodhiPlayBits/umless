@@ -77,9 +77,11 @@ export function transcribeFailure(error: unknown): TranscribeFailure {
   if (code === 'audio_too_large') {
     return { title: 'This recording is over 25 MB', detail: 'Record a shorter answer.', canRetry: false }
   }
+  // Sending the same take again can't fix these.
+  const retryable = code !== 'unsupported_audio_type' && code !== 'invalid_host'
   return {
     title: 'Something went wrong',
     detail: `The server answered with code ${status}. Download the audio so you don't lose it.`,
-    canRetry: true,
+    canRetry: retryable,
   }
 }

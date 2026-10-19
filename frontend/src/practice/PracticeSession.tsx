@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../client'
 import ChoiceDialog from '../components/ChoiceDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
+import Toast from '../components/Toast'
+import type { ToastMessage } from '../components/Toast'
 import { baseFileName } from '../filenames'
 import Link from '../Link'
 import { RecorderError, extensionFor, isRecordingSupported, startRecording as realStartRecording } from '../recorder'
@@ -12,6 +14,7 @@ import { useObjectUrl } from '../useObjectUrl'
 import { transcribeFailure, transcribeRecording as realTranscribe } from './practiceApi'
 import type { PracticeQuestion, TranscribeFailure, Transcript } from './practiceApi'
 import RecordingStage from './RecordingStage'
+import ResultView from './ResultView'
 
 /** The browser's permission prompt is only explained if it hasn't answered by then (F3.2). */
 const PERMISSION_HINT_MS = 400
@@ -59,15 +62,20 @@ export default function PracticeSession({
   const [leaveTarget, setLeaveTarget] = useState<string | null | undefined>(undefined) // undefined = no dialog; null = Cancel take
   const [confirmRecordAgain, setConfirmRecordAgain] = useState(false)
   const [audioDownloaded, setAudioDownloaded] = useState(false)
+  const [transcriptDownloaded, setTranscriptDownloaded] = useState(false)
+  // E14: where to go once the user confirms leaving an unsaved take ('again' = Practise again here).
+  const [unsavedLeave, setUnsavedLeave] = useState<string | null>(null)
+  const [toast, setToast] = useState<ToastMessage | null>(null)
+  const dismissToast = useCallback(() => setToast(null), [])
   const handleRef = useRef<RecorderHandle | null>(null)
   const stoppingRef = useRef(false)
   const mountedRef = useRef(true)
 
   const take = 'take' in stage ? stage.take : null
   const audioUrl = useObjectUrl(take?.recording.blob ?? null)
-  const audioName = take
-    ? `${baseFileName(question, take.recordedAt)}.${extensionFor(take.recording.mimeType)}`
-    : ''
+  const baseName = take ? baseFileName(question, take.recordedAt) : ''
+  const audioName = take ? `${baseName}.${extensionFor(take.recording.mimeType)}` : ''
+  const downloadedAny = audioDownloaded || transcriptDownloaded
 
   // Release the microphone if the page goes away mid-recording.
   useEffect(() => {
@@ -94,7 +102,10 @@ export default function PracticeSession({
       handleRef.current = null
       stoppingRef.current = false
       if (!mountedRef.current) return
+      // An auto-stop can land while "Stop and discard?" is open; that question no longer applies.
+      setLeaveTarget(undefined)
       setAudioDownloaded(false)
+      setTranscriptDownloaded(false)
       if (recording.blob.size === 0) setStage({ name: 'empty' })
       else setStage({ name: 'review', take: { recording, recordedAt: now() }, notice })
     },
@@ -165,9 +176,43 @@ export default function PracticeSession({
   // Stable, so the recording stage's timer isn't restarted on every render.
   const readLevel = useCallback(() => handleRef.current?.level?.() ?? null, [])
 
-  // E15: leaving (or "Cancel take") while recording asks first.
-  const onBlocked = useCallback((path: string) => setLeaveTarget(path), [])
-  useNavigationGuard(stage.name === 'recording' ? onBlocked : null)
+  // E15: leaving (or "Cancel take") while recording asks first. E14: so does leaving a take
+  // that nothing has been downloaded from; it isn't stored anywhere else.
+  const onBlockedRecording = useCallback((path: string) => setLeaveTarget(path), [])
+  const onBlockedUnsaved = useCallback((path: string) => setUnsavedLeave(path), [])
+  useNavigationGuard(
+    stage.name === 'recording' ? onBlockedRecording : take && !downloadedAny ? onBlockedUnsaved : null,
+  )
+
+  function practiseAgain() {
+    if (take && !downloadedAny) setUnsavedLeave('again')
+    else setStage({ name: 'ready' })
+  }
+
+  function leaveUnsaved(target: string) {
+    setUnsavedLeave(null)
+    if (target === 'again') setStage({ name: 'ready' })
+    else navigate(target, { force: true })
+  }
+
+  function downloadAudioNow() {
+    if (!audioUrl) return
+    const link = document.createElement('a')
+    link.href = audioUrl
+    link.download = audioName
+    link.click()
+    setAudioDownloaded(true)
+    setUnsavedLeave(null)
+  }
+
+  async function copyTranscript(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setToast({ id: Date.now(), text: 'Copied to clipboard' })
+    } catch {
+      setToast({ id: Date.now(), text: 'Select and copy the text instead' })
+    }
+  }
 
   // E22: Space starts and stops recording when focus isn't on a control.
   useEffect(() => {
@@ -189,12 +234,12 @@ export default function PracticeSession({
 
   return (
     <>
-      {stage.name === 'ready' && (
+      {(stage.name === 'ready' || stage.name === 'result') && (
         <div className="crumb muted">
           <span>
             Question {number} of {total}
           </span>
-          {nextId && <Link to={practicePath(nextId)}>Next question →</Link>}
+          {nextId && stage.name === 'ready' && <Link to={practicePath(nextId)}>Next question →</Link>}
         </div>
       )}
       <h1 className="question">{question}</h1>
@@ -352,15 +397,38 @@ export default function PracticeSession({
         </>
       )}
 
-      {stage.name === 'result' && (
-        // Screen 8 (result) fills this in: summary, highlighted transcript, downloads.
-        <article className="card transcript">
-          <h2>Transcript</h2>
-          <p className="body">{stage.transcript.text}</p>
-        </article>
+      {stage.name === 'result' && audioUrl && (
+        <ResultView
+          question={question}
+          transcript={stage.transcript}
+          recordedMs={stage.take.recording.durationMs}
+          audioUrl={audioUrl}
+          audioName={audioName}
+          baseName={baseName}
+          nextId={nextId}
+          onAudioDownloaded={() => setAudioDownloaded(true)}
+          onTranscriptDownloaded={() => setTranscriptDownloaded(true)}
+          onCopy={(text) => void copyTranscript(text)}
+          onPractiseAgain={practiseAgain}
+        />
       )}
 
-      {leaveTarget !== undefined && (
+      {unsavedLeave !== null && (
+        <ChoiceDialog
+          title="Leave without saving?"
+          choices={[
+            { label: 'Stay', onClick: () => setUnsavedLeave(null) },
+            { label: '⬇ Download audio', onClick: downloadAudioNow },
+            { label: 'Leave', style: 'danger', onClick: () => leaveUnsaved(unsavedLeave) },
+          ]}
+        >
+          <p>Your recording and transcript aren't stored anywhere. Download them first if you want to keep them.</p>
+        </ChoiceDialog>
+      )}
+
+      <Toast toast={toast} onDismiss={dismissToast} />
+
+      {leaveTarget !== undefined && stage.name === 'recording' && (
         <ChoiceDialog
           title="Stop and discard this recording?"
           choices={[

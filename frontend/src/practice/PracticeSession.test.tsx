@@ -17,7 +17,30 @@ const audio = (size = 3): Recording => ({
   mimeType: 'audio/webm',
   durationMs: 65_000,
 })
-const transcript = { text: 'Hello there world', words: [], duration_seconds: 1, summary: {} } as unknown as Transcript
+const word = (w: string, start: number) => ({
+  word: w.toLowerCase(),
+  punctuated_word: w,
+  start,
+  end: start + 0.3,
+  confidence: 0.9,
+  is_filler: false,
+  pause_before_seconds: 0,
+})
+// A contract-valid Transcript (docs/api/openapi.yaml): words, duration and a full summary.
+const transcript: Transcript = {
+  text: 'Hello there world',
+  words: [word('Hello', 0), word('there', 0.3), word('world', 0.6)],
+  duration_seconds: 1,
+  summary: {
+    word_count: 3,
+    filler_count: 0,
+    fillers: [],
+    words_per_minute: 180,
+    fillers_per_minute: 0,
+    pause_count: 0,
+    longest_pause_seconds: null,
+  },
+}
 const fixedNow = () => new Date(2026, 9, 19, 14, 5, 9)
 const g = globalThis as Record<string, unknown>
 
@@ -322,6 +345,18 @@ describe('PracticeSession leave confirmation', () => {
     await s.user.click(screen.getByRole('button', { name: 'Discard' }))
     await waitFor(() => expect(startBtn()).toBeInTheDocument())
     expect(s.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes the recording dialog when the recording stops by itself, keeping the take', async () => {
+    const s = await recording()
+    await s.user.click(screen.getByRole('button', { name: 'Cancel take' }))
+    expect(screen.getByRole('alertdialog', { name: 'Stop and discard this recording?' })).toBeInTheDocument()
+
+    act(() => s.autoStop()(audio(), 'limit'))
+
+    expect(await screen.findByText('Stopped at the 10-minute limit')).toBeInTheDocument()
+    expect(screen.queryByRole('alertdialog', { name: 'Stop and discard this recording?' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Transcribe' })).toBeInTheDocument()
   })
 
   it('an in-app navigate() asks first, and Discard then completes the navigation', async () => {

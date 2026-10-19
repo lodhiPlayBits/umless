@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../client'
-import { transcribeFailure } from './practiceApi'
+import { transcribeFailure, transcribeRecording } from './practiceApi'
 
 const err = (status: number, code?: ConstructorParameters<typeof ApiError>[2]) => new ApiError('x', status, code)
 
@@ -31,5 +31,49 @@ describe('transcribeFailure', () => {
 
   it('treats a non-ApiError as unreachable', () => {
     expect(transcribeFailure(new TypeError('boom')).title).toBe("Can't reach the umless server")
+  })
+})
+
+describe('transcribeFailure: no pointless retry', () => {
+  it('offers no Try again for 415 unsupported_audio_type or 400 invalid_host', () => {
+    expect(transcribeFailure(err(415, 'unsupported_audio_type')).canRetry).toBe(false)
+    expect(transcribeFailure(err(400, 'invalid_host')).canRetry).toBe(false)
+  })
+
+  it('still offers Try again for an unexpected 500 internal_error', () => {
+    expect(transcribeFailure(err(500, 'internal_error')).canRetry).toBe(true)
+  })
+})
+
+describe('transcribeRecording', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('POSTs the raw audio with its content type and returns the transcript', async () => {
+    const transcript = { text: 'um hi', words: [], duration_seconds: 1, summary: {} }
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(
+      async () => new Response(JSON.stringify(transcript), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    // A native Blob: jsdom's Blob isn't one Node's Request can read, so it would send "[object Blob]".
+    const audio = await new Response('abc', { headers: { 'Content-Type': 'audio/webm;codecs=opus' } }).blob()
+
+    await expect(transcribeRecording(audio)).resolves.toEqual(transcript)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const request = fetchMock.mock.calls[0][0]
+    expect(new URL(request.url).pathname).toBe('/api/transcriptions')
+    expect(request.method).toBe('POST')
+    expect(request.headers.get('Content-Type')).toBe('audio/webm;codecs=opus')
+    expect(await request.text()).toBe('abc')
+  })
+
+  it('rejects with an ApiError carrying the contract code', async () => {
+    const body = { code: 'transcription_failed', detail: 'Transcription failed. Try again in a moment.' }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 502, headers: { 'Content-Type': 'application/json' } })))
+
+    const error = await transcribeRecording(new Blob(['a'], { type: 'audio/webm' })).catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ status: 502, code: 'transcription_failed' })
   })
 })

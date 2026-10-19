@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../client'
@@ -210,6 +210,15 @@ describe('QuestionsScreen edit', () => {
     expect(await screen.findByText('✓ Saved')).toBeInTheDocument()
     expect(screen.getByText('Why us?')).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Edit question 2' })).toBeNull()
+  })
+
+  it('does not save on the Enter that confirms an IME composition', async () => {
+    const user = await renderScreen()
+    await user.click(screen.getByRole('button', { name: 'Edit question 2' }))
+    const input = screen.getByRole('textbox', { name: 'Edit question 2' })
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(mocked.updateQuestion).not.toHaveBeenCalled()
+    expect(input).toBeInTheDocument()
   })
 
   it('starts editing on double-click of the text', async () => {
