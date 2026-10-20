@@ -22,11 +22,18 @@ backend/
     main.py            create_app(): middleware, error handlers, routers
     config.py          Settings from env (.env files), Deepgram constants
     errors.py          ApiError, error codes, exception handlers  (new)
+    http.py            request helpers shared by routers (settings, media type)
     questions/         (new)
+      domain.py        Question and the text rules (length, trim) every layer shares
       models.py        Pydantic request/response models
       repository.py    QuestionRepository Protocol + JsonFileQuestionRepository
       router.py        /api/questions routes
-    transcription.py   Transcriber Protocol, Deepgram + Fake, pause dots
+    transcription/
+      models.py        Word, Transcript, TranscriptionError, Transcriber Protocol
+      text.py          pause dots and the transcript text
+      deepgram.py      DeepgramTranscriber and its response parsing
+      fake.py          FakeTranscriber
+      router.py        /api/transcriptions route, get_transcriber
     summary.py         filler detection and TranscriptSummary  (new)
   data/questions.json  runtime data, git-ignored
   tests/
