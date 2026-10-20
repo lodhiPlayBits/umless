@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../client'
 import ChoiceDialog from '../components/ChoiceDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
+import ErrorBanner from '../components/ErrorBanner'
 import Toast from '../components/Toast'
 import type { ToastMessage } from '../components/Toast'
 import { baseFileName } from '../filenames'
@@ -368,13 +369,7 @@ export default function PracticeSession({
           )}
 
           {stage.name === 'transcribe-error' && (
-            <div className="banner error" role="alert">
-              <span aria-hidden="true">⚠</span>
-              <div>
-                <strong>{stage.failure.title}</strong>
-                <span className="small">{stage.failure.detail}</span>
-              </div>
-            </div>
+            <ErrorBanner title={stage.failure.title} detail={stage.failure.detail} />
           )}
 
           {stage.name === 'review' && <p className="hint">Not saved anywhere yet. Transcribe it, or download the audio to keep it.</p>}
@@ -477,47 +472,47 @@ export default function PracticeSession({
 }
 
 function MicError({ kind, message, onRetry }: { kind: 'denied' | 'no-mic' | 'failed'; message: string; onRetry: () => void }) {
+  const actions = (
+    <>
+      <button type="button" className="btn btn-primary" onClick={onRetry}>
+        Try again
+      </button>
+      <Link to="/" className="btn">
+        Back to questions
+      </Link>
+    </>
+  )
+  if (kind === 'denied') {
+    return (
+      <ErrorBanner icon="🎙" title="umless needs your microphone" actions={actions}>
+        <ol className="small steps">
+          <li>Click the lock or tune icon left of the address bar.</li>
+          <li>
+            Set <strong>Microphone</strong> to <strong>Allow</strong>.
+          </li>
+          <li>
+            Come back and press <strong>Try again</strong>.
+          </li>
+        </ol>
+      </ErrorBanner>
+    )
+  }
+  if (kind === 'no-mic') {
+    return (
+      <ErrorBanner
+        icon="🎙"
+        title="No microphone found"
+        detail="Plug in a headset or check that your microphone is enabled in your system sound settings, then try again."
+        actions={actions}
+      />
+    )
+  }
   return (
-    <div className="banner error" role="alert">
-      <span aria-hidden="true">🎙</span>
-      <div>
-        {kind === 'denied' && (
-          <>
-            <strong>umless needs your microphone</strong>
-            <ol className="small steps">
-              <li>Click the lock or tune icon left of the address bar.</li>
-              <li>
-                Set <strong>Microphone</strong> to <strong>Allow</strong>.
-              </li>
-              <li>
-                Come back and press <strong>Try again</strong>.
-              </li>
-            </ol>
-          </>
-        )}
-        {kind === 'no-mic' && (
-          <>
-            <strong>No microphone found</strong>
-            <span className="small">
-              Plug in a headset or check that your microphone is enabled in your system sound settings, then try again.
-            </span>
-          </>
-        )}
-        {kind === 'failed' && (
-          <>
-            <strong>The microphone couldn't start</strong>
-            <span className="small">{message}. Close other apps that use the microphone, then try again.</span>
-          </>
-        )}
-        <div className="actions">
-          <button type="button" className="btn btn-primary" onClick={onRetry}>
-            Try again
-          </button>
-          <Link to="/" className="btn">
-            Back to questions
-          </Link>
-        </div>
-      </div>
-    </div>
+    <ErrorBanner
+      icon="🎙"
+      title="The microphone couldn't start"
+      detail={`${message}. Close other apps that use the microphone, then try again.`}
+      actions={actions}
+    />
   )
 }
