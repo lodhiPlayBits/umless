@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '../client'
 import ConfirmDialog from '../components/ConfirmDialog'
+import LoadErrorBanner from '../components/LoadErrorBanner'
 import Toast from '../components/Toast'
 import type { ToastMessage } from '../components/Toast'
 import AddQuestionForm from './AddQuestionForm'
@@ -161,7 +162,9 @@ export default function QuestionsScreen() {
         </>
       )}
 
-      {load.status === 'error' && <LoadError error={load.error} onRetry={() => void loadQuestions()} />}
+      {load.status === 'error' && (
+        <LoadErrorBanner error={load.error} title="Couldn't load your questions" onRetry={() => void loadQuestions()} />
+      )}
 
       <AddQuestionForm questions={questions} disabled={!ready} onAdd={addQuestion} />
 
@@ -244,32 +247,5 @@ export default function QuestionsScreen() {
 
       <Toast toast={toast} onDismiss={dismissToast} />
     </>
-  )
-}
-
-function LoadError({ error, onRetry }: { error: ApiError; onRetry: () => void }) {
-  // No error code means no answer from the backend itself (offline, or the dev proxy's 5xx).
-  const unreachable = error.code === undefined
-  return (
-    <div className="banner error" role="alert">
-      <span aria-hidden="true">⚠</span>
-      <div>
-        <strong>{unreachable ? "Can't reach the umless server" : "Couldn't load your questions"}</strong>
-        <span className="small">
-          {unreachable ? (
-            <>
-              Start the backend with <code>python run.py</code> in the <code>backend</code> folder, then retry.
-            </>
-          ) : (
-            error.message
-          )}
-        </span>
-        <div className="actions">
-          <button type="button" className="btn btn-primary" onClick={onRetry}>
-            Retry
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }

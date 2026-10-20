@@ -90,6 +90,21 @@ describe('QuestionsScreen loading', () => {
     expect(screen.queryByText("Can't reach the umless server")).toBeNull()
   })
 
+  it("shows the backend's own message when it answered with an error code", async () => {
+    mocked.listQuestions.mockRejectedValue(new ApiError('Questions file is unreadable', 500, 'internal_error'))
+    render(<QuestionsScreen />)
+    expect(await screen.findByText("Couldn't load your questions")).toBeInTheDocument()
+    expect(screen.getByText('Questions file is unreadable')).toBeInTheDocument()
+    expect(screen.queryByText("Can't reach the umless server")).toBeNull()
+  })
+
+  it('treats a 4xx without an error code as an answer, not as the backend being down', async () => {
+    mocked.listQuestions.mockRejectedValue(new ApiError('Request failed (404)', 404))
+    render(<QuestionsScreen />)
+    expect(await screen.findByText("Couldn't load your questions")).toBeInTheDocument()
+    expect(screen.getByText('Request failed (404)')).toBeInTheDocument()
+  })
+
   it('shows skeleton rows only after 300 ms of loading', async () => {
     vi.useFakeTimers()
     mocked.listQuestions.mockReturnValue(new Promise(() => {}))

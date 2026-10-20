@@ -1,3 +1,4 @@
+import { classifyApiError } from '../apiErrors'
 import { ApiError, client, unwrap } from '../client'
 import type { Question } from './questionText'
 
@@ -24,7 +25,7 @@ export async function deleteQuestion(questionId: string): Promise<void> {
 
 /** The error text for a failed save; the typed text is always kept for a retry. */
 export function saveErrorMessage(error: unknown, retryLabel: string): string {
-  if (error instanceof ApiError && error.code === 'validation_error' && error.fields?.length) {
+  if (classifyApiError(error) === 'validation' && error instanceof ApiError && error.fields?.length) {
     return error.fields[0].message
   }
   return `Couldn't save. Check that the backend is running, then press ${retryLabel} again.`

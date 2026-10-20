@@ -1,3 +1,5 @@
+import { PageCrash } from './AppCrash'
+import ErrorBoundary from './components/ErrorBoundary'
 import Link from './Link'
 import NotFound from './NotFound'
 import PracticeRoute from './practice/PracticeRoute'
@@ -5,7 +7,8 @@ import QuestionsScreen from './questions/QuestionsScreen'
 import { parseRoute, usePathname } from './router'
 
 function App() {
-  const route = parseRoute(usePathname())
+  const pathname = usePathname()
+  const route = parseRoute(pathname)
 
   return (
     <>
@@ -20,9 +23,12 @@ function App() {
         )}
       </header>
       <main>
-        {route.name === 'questions' && <QuestionsScreen />}
-        {route.name === 'practice' && <PracticeRoute key={route.questionId} questionId={route.questionId} />}
-        {route.name === 'notFound' && <NotFound />}
+        {/* Keyed by path: navigating away from a crashed page clears the fallback. */}
+        <ErrorBoundary key={pathname} fallback={<PageCrash showBack={route.name !== 'questions'} />}>
+          {route.name === 'questions' && <QuestionsScreen />}
+          {route.name === 'practice' && <PracticeRoute key={route.questionId} questionId={route.questionId} />}
+          {route.name === 'notFound' && <NotFound />}
+        </ErrorBoundary>
       </main>
     </>
   )
