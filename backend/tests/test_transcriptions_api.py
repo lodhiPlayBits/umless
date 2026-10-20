@@ -7,13 +7,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.main import create_app, get_transcriber
+from app.main import create_app
 from app.transcription import (
     DeepgramTranscriber,
     Transcript,
     TranscriptionError,
     Word,
 )
+from app.transcription.router import get_transcriber
 
 OPENAPI = Path(__file__).resolve().parents[2] / "docs" / "api" / "openapi.yaml"
 FIXTURES = Path(__file__).parent / "fixtures"

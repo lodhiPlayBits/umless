@@ -4,8 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.main import create_app, get_transcriber
+from app.main import create_app
 from app.transcription import Transcript
+from app.transcription.router import get_transcriber
 
 INVALID_HOST = {"code": "invalid_host", "detail": "Invalid Host header."}
 

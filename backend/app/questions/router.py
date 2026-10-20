@@ -3,6 +3,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, Depends, Request, Response
 
 from app.errors import ApiError
+from app.http import media_type
 from app.questions.models import QuestionCreate, QuestionUpdate
 from app.questions.repository import QuestionRepository
 
@@ -22,8 +23,7 @@ def get_question_repository(request: Request) -> QuestionRepository:
 def require_json(request: Request) -> None:
     # Rejecting everything but application/json (a missing header too) stops cross-site
     # form posts, which skip the CORS preflight (ADR 0001).
-    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
-    if content_type != "application/json":
+    if media_type(request) != "application/json":
         raise ApiError(415, "unsupported_media_type", "Send the request body as application/json.")
 
 

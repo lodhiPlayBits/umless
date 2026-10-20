@@ -10,9 +10,10 @@ import schemathesis
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.main import create_app, get_transcriber
+from app.main import create_app
 from app.questions.router import get_question_repository
 from app.transcription import TranscriptionError
+from app.transcription.router import get_transcriber
 
 schema = schemathesis.pytest.from_fixture("contract_schema")
 
