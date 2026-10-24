@@ -1,0 +1,47 @@
+# Backend (FastAPI). Included by deploy/docker-compose.yml; can also be run on its own
+# from this folder (`docker compose up -d --build`) to rebuild just the backend.
+# Not published on the host: the gateway reaches it as backend:8000 on the umless network.
+name: umless
+
+services:
+  backend:
+    build: .
+    image: umless-backend
+    container_name: umless-backend
+    # Secrets (DEEPGRAM_API_KEY, later CLERK_SECRET_KEY) stay in the git-ignored repo-root .env.
+    env_file: ../.env
+    environment:
+      # deepgram: real transcription (needs DEEPGRAM_API_KEY); fake: canned transcript, no cost.
+      UMLESS_TRANSCRIBER: deepgram
+      # Relative to /app inside the container; must stay under /app/data (the volume below).
+      UMLESS_DATA_FILE: data/questions.json
+    volumes:
+      - questions-data:/app/data
+    # Raise if transcriptions of long recordings get slow; one uvicorn process uses one CPU.
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      # The backend only accepts a localhost Host header (DNS-rebinding guard).
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/api/health', headers={'Host': 'localhost'}), timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - umless
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  # questions.json; survives rebuilds. Back up with:
+  #   docker compose cp backend:/app/data/questions.json .
+  questions-data:
+    name: umless-questions-data
+
+networks:
+  umless:
+    name: umless
