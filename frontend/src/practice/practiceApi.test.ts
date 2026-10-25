@@ -67,6 +67,19 @@ describe('transcribeRecording', () => {
     expect(await request.text()).toBe('abc')
   })
 
+  it('sends the question id, so the server saves the take, and none without one', async () => {
+    const transcript = { text: '', words: [], duration_seconds: 1, summary: {}, take_id: 't1' }
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json(transcript))
+    vi.stubGlobal('fetch', fetchMock)
+    const audio = new Blob(['a'], { type: 'audio/webm' })
+
+    await expect(transcribeRecording(audio, 'q 1')).resolves.toMatchObject({ take_id: 't1' })
+    await transcribeRecording(audio)
+
+    expect(new URL(fetchMock.mock.calls[0][0].url).searchParams.get('questionId')).toBe('q 1')
+    expect(new URL(fetchMock.mock.calls[1][0].url).search).toBe('')
+  })
+
   it('rejects with an ApiError carrying the contract code', async () => {
     const body = { code: 'transcription_failed', detail: 'Transcription failed. Try again in a moment.' }
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 502, headers: { 'Content-Type': 'application/json' } })))

@@ -35,6 +35,12 @@ class QuestionRepository(Protocol):
     def delete(self, id: str) -> bool: ...
 
 
+class QuestionStore(Protocol):
+    """Where every user's questions live; app.state.questions holds one."""
+
+    def for_user(self, user_id: str) -> QuestionRepository: ...
+
+
 class JsonFileQuestionRepository:
     """Questions in one JSON file: loaded once, every change written through atomically.
 
@@ -54,6 +60,10 @@ class JsonFileQuestionRepository:
         self._retry_delay = retry_delay
         self._lock = threading.Lock()
         self._questions = self._load()
+
+    def for_user(self, user_id: str) -> JsonFileQuestionRepository:
+        # One local list, whoever asks: the file store is for a single user on their machine.
+        return self
 
     def list(self) -> list[Question]:
         with self._lock:

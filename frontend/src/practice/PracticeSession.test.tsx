@@ -79,6 +79,7 @@ function setup(
     practiceProp?: typeof practice
   } = {},
 ) {
+  const takes = { list: vi.fn().mockResolvedValue([]), get: vi.fn(), remove: vi.fn() }
   const recording = opts.recording ?? audio()
   const stop = vi.fn().mockResolvedValue(recording)
   const handle = { mimeType: recording.mimeType, stop, level: () => 0.5 }
@@ -93,10 +94,11 @@ function setup(
     serverUp: opts.serverUp ?? true,
     startRecording: startRecording as never,
     transcribe,
+    takes,
     now: fixedNow,
   })
   const view = render(<PracticeSession {...props()} />)
-  return { ...view, props, startRecording, transcribe, stop, autoStop: () => options.onAutoStop, user: userEvent.setup() }
+  return { ...view, props, startRecording, transcribe, takes, stop, autoStop: () => options.onAutoStop, user: userEvent.setup() }
 }
 
 const startBtn = () => screen.getByRole('button', { name: 'Start recording' })
@@ -380,5 +382,49 @@ describe('PracticeSession question snapshot (E17)', () => {
       'download',
       'tell-me-about-yourself-20261019-140509.webm',
     )
+  })
+})
+
+describe('PracticeSession saved takes', () => {
+  async function transcribed(take_id?: string | null) {
+    const s = setup({ transcribe: () => Promise.resolve(take_id === undefined ? transcript : { ...transcript, take_id }) })
+    await record(s)
+    await s.user.click(screen.getByRole('button', { name: 'Transcribe' }))
+    await screen.findByText('How it went')
+    return s
+  }
+
+  it('lists the past takes of this question on the ready screen', async () => {
+    const s = setup()
+    expect(await screen.findByRole('heading', { name: 'Past takes' })).toBeInTheDocument()
+    expect(s.takes.list).toHaveBeenCalledWith('q1', expect.any(AbortSignal))
+  })
+
+  it('transcribes for this question, so the server saves the take', async () => {
+    const s = await transcribed('t1')
+    expect(s.transcribe).toHaveBeenCalledWith(expect.any(Blob), 'q1')
+  })
+
+  it('says the take was saved', async () => {
+    await transcribed('t1')
+    expect(screen.getByText('Saved to your past takes.')).toBeInTheDocument()
+  })
+
+  it('warns when the take could not be saved', async () => {
+    await transcribed(null)
+    expect(screen.getByRole('alert')).toHaveTextContent("This take couldn't be saved")
+    expect(screen.queryByText('Saved to your past takes.')).not.toBeInTheDocument()
+  })
+
+  it('leaving a saved take warns only about the recording', async () => {
+    const s = await transcribed('t1')
+    await s.user.click(screen.getByRole('button', { name: 'Practise again' }))
+    expect(within(screen.getByRole('alertdialog')).getByText(/transcript is saved in your past takes/)).toBeInTheDocument()
+  })
+
+  it('leaving an unsaved take still warns that nothing is stored', async () => {
+    const s = await transcribed(null)
+    await s.user.click(screen.getByRole('button', { name: 'Practise again' }))
+    expect(within(screen.getByRole('alertdialog')).getByText(/aren't stored anywhere/)).toBeInTheDocument()
   })
 })

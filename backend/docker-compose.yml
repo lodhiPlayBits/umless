@@ -8,8 +8,13 @@ services:
     build: .
     image: umless-backend
     container_name: umless-backend
-    # Secrets (DEEPGRAM_API_KEY, later CLERK_SECRET_KEY) stay in the git-ignored repo-root .env.
-    env_file: ../.env
+    # Secrets (DEEPGRAM_API_KEY, later CLERK_SECRET_KEY) stay in a git-ignored .env, either
+    # backend/.env or the repo root's; backend/.env wins, as in app/config.py.
+    env_file:
+      - path: ../.env
+        required: false
+      - path: .env
+        required: false
     environment:
       # deepgram: real transcription (needs DEEPGRAM_API_KEY); fake: canned transcript, no cost.
       UMLESS_TRANSCRIBER: deepgram

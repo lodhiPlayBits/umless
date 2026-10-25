@@ -2,11 +2,14 @@ openapi: 3.1.0
 info:
   title: umless API
   version: 1.0.0
-  summary: Local speech practice backend - questions and transcription.
+  summary: Speech practice backend - questions and transcription.
   description: |
-    Contract for umless v1 (see docs/prd.md and docs/adr/0001-architecture.md).
-    Local and single-user: the server binds to 127.0.0.1, accepts only localhost Host
-    headers, and has no authentication. Every non-2xx response uses the `Error` schema.
+    Contract for umless (see docs/prd.md, docs/adr/0001-architecture.md and
+    docs/adr/0003-clerk-auth.md). Every operation except getHealth needs a Clerk session
+    token (`clerkSession`); each signed-in user sees only their own questions. A backend
+    started without Clerk configured (local, single-user use) accepts calls without a token,
+    and everyone is one local user. The server accepts only localhost Host headers (the
+    public gateway sends one). Every non-2xx response uses the `Error` schema.
     `x-screen` on each operation names the screen actions from docs/design/screens.md it serves.
   license:
     name: Proprietary
@@ -14,14 +17,17 @@ info:
 servers:
   - url: http://127.0.0.1:8000
     description: Local backend (the Vite dev server proxies /api here)
-security: []
+security:
+  - clerkSession: []
 tags:
   - name: health
     description: Server availability
   - name: questions
-    description: The user's practice questions (persisted in a JSON file)
+    description: The signed-in user's practice questions (MySQL, or a JSON file locally)
   - name: transcriptions
-    description: Speech-to-text through Deepgram; nothing is stored
+    description: Speech-to-text through Deepgram; the audio is never stored
+  - name: takes
+    description: The signed-in user's saved transcripts, per question (records in MySQL, transcripts in object storage)
 
 paths:
   /api/health:
@@ -65,8 +71,9 @@ paths:
         question at an earlier position. The practice route also loads from this list: it finds
         the question by id (missing → `not-found`), and uses its index for "2 of 5" and for
         Next question, so one read serves the whole screen and can't disagree with itself.
-      security: []
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: All questions.
           content:
@@ -91,7 +98,6 @@ paths:
         - questions-empty / add suggested question
         - questions-invalid / fix and create question, add anyway, retry save
         - questions-deleted / undo delete (with position)
-      security: []
       requestBody:
         required: true
         content:
@@ -109,6 +115,8 @@ paths:
                   text: Why do you want this job?
                   position: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '201':
           description: Created.
           headers:
@@ -144,7 +152,6 @@ paths:
       x-screen:
         - questions / update question (Save in inline edit)
         - questions-invalid / retry save (edit mode)
-      security: []
       requestBody:
         required: true
         content:
@@ -152,6 +159,8 @@ paths:
             schema:
               $ref: '#/components/schemas/QuestionUpdate'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: The updated question.
           content:
@@ -172,11 +181,14 @@ paths:
       operationId: deleteQuestion
       tags: [questions]
       summary: Delete a question
-      description: The client treats 404 as already deleted.
+      description: |
+        Also deletes the question's saved takes (Undo brings back the question, not its takes).
+        The client treats 404 as already deleted.
       x-screen:
         - delete-confirm / delete question
-      security: []
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '204':
           description: Deleted.
         '404':
@@ -198,10 +210,24 @@ paths:
         Deepgram nova-3 with `filler_words=true`, `smart_format=true`, `language=en` and
         `mip_opt_out=true`, and is not stored. Silence returns 200 with empty `text` and
         `words` (shown as `result-empty`).
+
+        With `questionId`, the transcript is also saved as a take of that question (one of the
+        signed-in user's questions, checked before Deepgram is called; otherwise 404) and the
+        response's `take_id` names it. If saving fails the transcript is still returned, with
+        `take_id: null`.
       x-screen:
         - practice-review / transcribe recording
         - practice-transcribe-error / retry transcription
-      security: []
+      parameters:
+        - name: questionId
+          in: query
+          required: false
+          description: Save the transcript as a take of this question.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+            example: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
       requestBody:
         required: true
         content:
@@ -221,6 +247,8 @@ paths:
             schema:
               $ref: '#/components/schemas/AudioBody'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: The transcript with filler flags, pauses and a summary.
           content:
@@ -247,6 +275,8 @@ paths:
               example:
                 code: audio_too_large
                 detail: The recording is larger than 25 MB.
+        '404':
+          $ref: '#/components/responses/QuestionNotFound'
         '415':
           description: The Content-Type is missing or not one of the accepted audio types.
           content:
@@ -277,6 +307,77 @@ paths:
                 code: transcription_unavailable
                 detail: Transcription is unavailable because DEEPGRAM_API_KEY is not set.
 
+  /api/questions/{questionId}/takes:
+    parameters:
+      - $ref: '#/components/parameters/QuestionId'
+    get:
+      operationId: listTakes
+      tags: [takes]
+      summary: List a question's saved takes, newest first
+      x-screen:
+        - practice-ready / past takes (on load)
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The question's takes, newest first; each without its transcript.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TakeList'
+        '404':
+          $ref: '#/components/responses/QuestionNotFound'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/takes/{takeId}:
+    parameters:
+      - $ref: '#/components/parameters/TakeId'
+    get:
+      operationId: getTake
+      tags: [takes]
+      summary: A saved take with its full transcript
+      x-screen:
+        - practice-ready / view past take
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The take and its transcript.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Take'
+        '404':
+          $ref: '#/components/responses/TakeNotFound'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/StorageUnavailable'
+    delete:
+      operationId: deleteTake
+      tags: [takes]
+      summary: Delete a saved take and its transcript
+      x-screen:
+        - practice-ready / delete past take
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/TakeNotFound'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/StorageUnavailable'
+
 components:
   parameters:
     QuestionId:
@@ -290,7 +391,55 @@ components:
         maxLength: 64
         example: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
 
+    TakeId:
+      name: takeId
+      in: path
+      required: true
+      description: The take's UUID. Anything that is not one of the user's takes returns 404.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        example: 7d1f0c3a-2b4e-4a6f-9c8d-1e2f3a4b5c6d
+
+  securitySchemes:
+    clerkSession:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        The Clerk session token from the frontend's `getToken()`, sent as
+        `Authorization: Bearer <token>`. Verified with Clerk's published keys (RS256); its
+        `sub` is the user id that owns the questions.
+
   responses:
+    TakeNotFound:
+      description: No take of the signed-in user has this id (deleted, unknown or someone else's).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: take_not_found
+            detail: That take doesn't exist any more.
+    StorageUnavailable:
+      description: Object storage couldn't be reached; nothing was changed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: storage_unavailable
+            detail: Your saved takes can't be reached right now. Try again in a moment.
+    Unauthorized:
+      description: No session token, or one that is invalid, expired or issued to another site.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: unauthorized
+            detail: Sign in to continue.
     InvalidHost:
       description: The Host header is not localhost or 127.0.0.1 (DNS-rebinding guard).
       content:
@@ -587,6 +736,12 @@ components:
           description: Audio length reported by Deepgram; null if not reported.
         summary:
           $ref: '#/components/schemas/TranscriptSummary'
+        take_id:
+          type: [string, 'null']
+          minLength: 1
+          description: |
+            Only in createTranscription responses sent with `questionId`: the saved take's id,
+            or null if saving failed. Never part of a saved take's transcript.
       example:
         text: So, .. um, I led the migration.
         words:
@@ -644,12 +799,82 @@ components:
           pause_count: 1
           longest_pause_seconds: 2.2
 
+    TakeSummary:
+      type: object
+      additionalProperties: false
+      required: [id, question_id, created_at, duration_seconds, summary]
+      properties:
+        id:
+          type: string
+          format: uuid
+        question_id:
+          type: string
+          minLength: 1
+        created_at:
+          type: string
+          format: date-time
+          description: When the take was saved, UTC.
+        duration_seconds:
+          type: [number, 'null']
+          minimum: 0
+        summary:
+          $ref: '#/components/schemas/TranscriptSummary'
+      example:
+        id: 7d1f0c3a-2b4e-4a6f-9c8d-1e2f3a4b5c6d
+        question_id: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
+        created_at: '2026-10-25T10:15:02Z'
+        duration_seconds: 4.5
+        summary:
+          word_count: 5
+          filler_count: 1
+          fillers:
+            - word: um
+              count: 1
+          words_per_minute: 67
+          fillers_per_minute: 13.3
+          pause_count: 1
+          longest_pause_seconds: 2.2
+
+    TakeList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: Newest first.
+          items:
+            $ref: '#/components/schemas/TakeSummary'
+
+    Take:
+      type: object
+      additionalProperties: false
+      required: [id, question_id, created_at, duration_seconds, summary, transcript]
+      properties:
+        id:
+          type: string
+          format: uuid
+        question_id:
+          type: string
+          minLength: 1
+        created_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: [number, 'null']
+          minimum: 0
+        summary:
+          $ref: '#/components/schemas/TranscriptSummary'
+        transcript:
+          $ref: '#/components/schemas/Transcript'
+
     ErrorCode:
       type: string
       enum:
         - validation_error
         - unsupported_media_type
         - question_not_found
+        - take_not_found
         - not_found
         - method_not_allowed
         - empty_audio
@@ -657,7 +882,9 @@ components:
         - unsupported_audio_type
         - transcription_failed
         - transcription_unavailable
+        - storage_unavailable
         - invalid_host
+        - unauthorized
         - internal_error
       description: |
         Stable machine-readable code. `not_found` and `method_not_allowed` are for unknown

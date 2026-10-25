@@ -5,6 +5,7 @@ import NotFound from './NotFound'
 import PracticeRoute from './practice/PracticeRoute'
 import QuestionsScreen from './questions/QuestionsScreen'
 import { parseRoute, usePathname } from './router'
+import { AccountMenu } from './SignInGate'
 
 function App() {
   const pathname = usePathname()
@@ -16,11 +17,14 @@ function App() {
         <Link to="/" className="logo" aria-label="umless, back to questions">
           um<span>less</span>
         </Link>
-        {route.name === 'practice' && (
-          <nav aria-label="Practice">
-            <Link to="/">← Questions</Link>
-          </nav>
-        )}
+        <div className="header-end">
+          {route.name === 'practice' && (
+            <nav aria-label="Practice">
+              <Link to="/">← Questions</Link>
+            </nav>
+          )}
+          <AccountMenu />
+        </div>
       </header>
       <main>
         {/* Keyed by path: navigating away from a crashed page clears the fallback. */}

@@ -46,7 +46,7 @@ docs/
 Existing modules stay where they are; only the new ones are added.
 
 ### Auth
-None in v1. Safety comes from the deployment shape instead:
+(Superseded by ADR 0003: Clerk sign-in for the deployed site.) None in v1. Safety comes from the deployment shape instead:
 - uvicorn binds to `127.0.0.1` only (already in `run.py`).
 - Starlette's `TrustedHostMiddleware` (part of FastAPI, no new dependency) allows only `localhost` and `127.0.0.1`, which blocks DNS-rebinding attacks from web pages. A rejected host gets the shared error body (400 `invalid_host`), not Starlette's plain-text default, so the check is a small custom middleware or a wrapper around it.
 - No CORS middleware: the browser reaches the API through the Vite proxy, so it's same-origin, and other origins can't read responses or send non-simple requests.

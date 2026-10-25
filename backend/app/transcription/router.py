@@ -1,18 +1,24 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.concurrency import run_in_threadpool
 
+from app.auth import get_user_id
 from app.config import Settings
 from app.errors import ApiError
 from app.http import get_settings, media_type
+from app.questions.domain import Question
+from app.questions.router import get_question_repository, question_not_found
 from app.summary import transcript_body
+from app.takes.service import TakeHistory, get_take_history
 from app.transcription.deepgram import DeepgramTranscriber
 from app.transcription.fake import FakeTranscriber
 from app.transcription.models import Transcriber, TranscriptionError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/transcriptions")
+# Signed-in users only: every transcription is a paid Deepgram call.
+router = APIRouter(prefix="/api/transcriptions", dependencies=[Depends(get_user_id)])
 
 ACCEPTED_AUDIO_TYPES = {"audio/webm", "audio/ogg", "audio/mp4", "audio/wav", "audio/mpeg"}
 
@@ -49,6 +55,9 @@ async def read_body_capped(request: Request, max_bytes: int) -> bytes:
 @router.post("")
 async def transcribe(
     request: Request,
+    # Unvalidated on purpose: a malformed id is one that doesn't exist (404), as on the question routes.
+    question_id: str | None = Query(None, alias="questionId"),
+    user_id: str = Depends(get_user_id),
     settings: Settings = Depends(get_settings),
     transcriber: Transcriber = Depends(get_transcriber),
 ) -> dict:
@@ -62,6 +71,15 @@ async def transcribe(
             " or audio/mpeg.",
         )
 
+    # Checked before the paid Deepgram call. The repositories block, so they run in the threadpool.
+    # The stores are only needed to save a take, so a plain transcription doesn't touch them.
+    question = None
+    if question_id is not None:
+        questions = get_question_repository(request, user_id)
+        question = await run_in_threadpool(questions.get, question_id)
+        if question is None:
+            raise question_not_found()
+
     audio = await read_body_capped(request, settings.max_body_bytes)
     if not audio:
         raise ApiError(400, "empty_audio", "The recording is empty.")
@@ -69,7 +87,7 @@ async def transcribe(
     try:
         transcript = await transcriber.transcribe(audio, content_type)
         # OverflowError: Deepgram's timings make the summary rates infinite.
-        return transcript_body(transcript)
+        body = transcript_body(transcript)
     except (TranscriptionError, OverflowError) as exc:
         # The user only sees "try again"; the cause (e.g. a revoked key, HTTP 401) goes to the
         # log. TranscriptionError messages never contain the API key.
@@ -77,3 +95,18 @@ async def transcribe(
         raise ApiError(
             502, "transcription_failed", "Transcription failed. Try again in a moment."
         ) from None
+
+    if question is not None:
+        body["take_id"] = await save_take(get_take_history(request, user_id), question, body)
+    return body
+
+
+async def save_take(history: TakeHistory, question: Question, body: dict) -> str | None:
+    """Keep the transcript in the user's history. Failing here never costs the user the
+    transcript they paid for: they get it back with take_id null."""
+    try:
+        take = await run_in_threadpool(history.save, question, dict(body))
+    except Exception:
+        logger.exception("Couldn't save the take")
+        return None
+    return take.id

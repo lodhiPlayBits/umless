@@ -13,6 +13,25 @@ export const client = createClient<paths>({
   fetch: (request) => globalThis.fetch(request),
 })
 
+type TokenSource = () => Promise<string | null>
+let tokenSource: TokenSource | null = null
+
+/**
+ * Sign every request with the session token from `source` (Clerk's getToken, which refreshes
+ * it before it expires). Never set without sign-in: local use and tests send no token.
+ */
+export function sendTokensFrom(source: TokenSource | null) {
+  tokenSource = source
+}
+
+client.use({
+  async onRequest({ request }) {
+    const token = await tokenSource?.()
+    if (token) request.headers.set('Authorization', `Bearer ${token}`)
+    return request
+  },
+})
+
 export class ApiError extends Error {
   name = 'ApiError'
   /** HTTP status; 0 means the server couldn't be reached. */

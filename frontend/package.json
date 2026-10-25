@@ -13,6 +13,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@clerk/react": "6.18.1",
     "openapi-fetch": "0.17.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

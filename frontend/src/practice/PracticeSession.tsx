@@ -12,9 +12,11 @@ import type { AutoStopReason, RecorderHandle, Recording } from '../recorder'
 import { navigate, practicePath, useNavigationGuard } from '../router'
 import { formatClock } from '../timeLabel'
 import { useObjectUrl } from '../useObjectUrl'
+import PastTakes from './PastTakes'
 import { transcribeFailure, transcribeRecording as realTranscribe } from './practiceApi'
 import type { PracticeQuestion, TranscribeFailure, Transcript } from './practiceApi'
 import RecordingStage from './RecordingStage'
+import type { TakesApi } from './takesApi'
 import ResultView from './ResultView'
 
 /** The browser's permission prompt is only explained if it hasn't answered by then (F3.2). */
@@ -43,6 +45,8 @@ interface PracticeSessionProps {
   serverUp: boolean | null
   startRecording?: typeof realStartRecording
   transcribe?: typeof realTranscribe
+  /** Past takes; the real API by default. */
+  takes?: TakesApi
   now?: () => Date
 }
 
@@ -55,6 +59,7 @@ export default function PracticeSession({
   serverUp,
   startRecording = realStartRecording,
   transcribe = realTranscribe,
+  takes,
   now = () => new Date(),
 }: PracticeSessionProps) {
   // E17: the question is a snapshot; edits elsewhere don't change this take or its file names.
@@ -160,7 +165,8 @@ export default function PracticeSession({
   async function runTranscription(current: Take) {
     setStage({ name: 'transcribing', take: current })
     try {
-      const transcript = await transcribe(current.recording.blob)
+      // The question id saves the transcript as a take of this question.
+      const transcript = await transcribe(current.recording.blob, practice.question.id)
       if (mountedRef.current) setStage({ name: 'result', take: current, transcript })
     } catch (error) {
       if (!mountedRef.current) return
@@ -261,8 +267,8 @@ export default function PracticeSession({
           </div>
           <p className="privacy">
             🔒 Your recording stays in this browser tab until you transcribe it. It's then sent to Deepgram for
-            transcription only, not used for training, and nothing is saved on our server. Download anything you want to
-            keep.
+            transcription only and not used for training. The transcript is saved to your past takes, which only you can
+            see; the recording itself is never stored, so download it if you want to keep it.
           </p>
           {serverUp === false && (
             <div className="banner warn small" role="status">
@@ -273,6 +279,7 @@ export default function PracticeSession({
               </div>
             </div>
           )}
+          <PastTakes questionId={practice.question.id} question={question} api={takes} />
         </>
       )}
 
@@ -392,6 +399,22 @@ export default function PracticeSession({
         </>
       )}
 
+      {stage.name === 'result' && stage.transcript.take_id && (
+        <p className="banner info small" role="status">
+          <span aria-hidden="true">✓</span>
+          <span>Saved to your past takes.</span>
+        </p>
+      )}
+      {stage.name === 'result' && stage.transcript.take_id === null && (
+        <div className="banner warn small" role="alert">
+          <span aria-hidden="true">⚠</span>
+          <div>
+            <strong>This take couldn't be saved</strong>
+            Download the transcript if you want to keep it.
+          </div>
+        </div>
+      )}
+
       {stage.name === 'result' && audioUrl && (
         <ResultView
           question={question}
@@ -417,7 +440,14 @@ export default function PracticeSession({
             { label: 'Leave', style: 'danger', onClick: () => leaveUnsaved(unsavedLeave) },
           ]}
         >
-          <p>Your recording and transcript aren't stored anywhere. Download them first if you want to keep them.</p>
+          {stage.name === 'result' && stage.transcript.take_id ? (
+            <p>
+              Your transcript is saved in your past takes, but the recording isn't stored anywhere. Download it first if you
+              want to keep it.
+            </p>
+          ) : (
+            <p>Your recording and transcript aren't stored anywhere. Download them first if you want to keep them.</p>
+          )}
         </ChoiceDialog>
       )}
 

@@ -2,22 +2,27 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, Request, Response
 
+from app.auth import get_user_id
 from app.errors import ApiError
 from app.http import media_type
 from app.questions.models import QuestionCreate, QuestionUpdate
-from app.questions.repository import QuestionRepository
+from app.questions.repository import QuestionRepository, QuestionStore
+from app.takes.service import TakeHistory, get_take_history
 
-router = APIRouter(prefix="/api/questions")
+# Router-level, so a request without a valid sign-in gets 401 before any body validation.
+router = APIRouter(prefix="/api/questions", dependencies=[Depends(get_user_id)])
 
 
-def get_question_repository(request: Request) -> QuestionRepository:
-    repository = getattr(request.app.state, "questions", None)
-    if repository is None:
+def get_question_repository(
+    request: Request, user_id: str = Depends(get_user_id)
+) -> QuestionRepository:
+    store: QuestionStore | None = getattr(request.app.state, "questions", None)
+    if store is None:
         raise RuntimeError(
-            "Question repository not loaded; enter the app's lifespan"
+            "Question store not loaded; enter the app's lifespan"
             " (use TestClient as a context manager)."
         )
-    return repository
+    return store.for_user(user_id)
 
 
 def require_json(request: Request) -> None:
@@ -64,7 +69,10 @@ def update_question(
 def delete_question(
     question_id: str,
     repository: QuestionRepository = Depends(get_question_repository),
+    history: TakeHistory = Depends(get_take_history),
 ) -> Response:
     if not repository.delete(question_id):
         raise question_not_found()
+    # Its takes go too: no screen could reach them once the question is gone.
+    history.delete_question(question_id)
     return Response(status_code=204)

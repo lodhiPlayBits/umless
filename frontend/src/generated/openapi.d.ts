@@ -69,7 +69,8 @@ export interface paths {
         post?: never;
         /**
          * Delete a question
-         * @description The client treats 404 as already deleted.
+         * @description Also deletes the question's saved takes (Undo brings back the question, not its takes).
+         *     The client treats 404 as already deleted.
          */
         delete: operations["deleteQuestion"];
         options?: never;
@@ -99,9 +100,55 @@ export interface paths {
          *     Deepgram nova-3 with `filler_words=true`, `smart_format=true`, `language=en` and
          *     `mip_opt_out=true`, and is not stored. Silence returns 200 with empty `text` and
          *     `words` (shown as `result-empty`).
+         *
+         *     With `questionId`, the transcript is also saved as a take of that question (one of the
+         *     signed-in user's questions, checked before Deepgram is called; otherwise 404) and the
+         *     response's `take_id` names it. If saving fails the transcript is still returned, with
+         *     `take_id: null`.
          */
         post: operations["createTranscription"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/questions/{questionId}/takes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The question's UUID. Anything that is not an existing id (malformed included) returns 404. */
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        /** List a question's saved takes, newest first */
+        get: operations["listTakes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/takes/{takeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The take's UUID. Anything that is not one of the user's takes returns 404. */
+                takeId: components["parameters"]["TakeId"];
+            };
+            cookie?: never;
+        };
+        /** A saved take with its full transcript */
+        get: operations["getTake"];
+        put?: never;
+        post?: never;
+        /** Delete a saved take and its transcript */
+        delete: operations["deleteTake"];
         options?: never;
         head?: never;
         patch?: never;
@@ -366,6 +413,59 @@ export interface components {
             /** @description Audio length reported by Deepgram; null if not reported. */
             duration_seconds: number | null;
             summary: components["schemas"]["TranscriptSummary"];
+            /**
+             * @description Only in createTranscription responses sent with `questionId`: the saved take's id,
+             *     or null if saving failed. Never part of a saved take's transcript.
+             */
+            take_id?: string | null;
+        };
+        /**
+         * @example {
+         *       "id": "7d1f0c3a-2b4e-4a6f-9c8d-1e2f3a4b5c6d",
+         *       "question_id": "3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10",
+         *       "created_at": "2026-10-25T10:15:02Z",
+         *       "duration_seconds": 4.5,
+         *       "summary": {
+         *         "word_count": 5,
+         *         "filler_count": 1,
+         *         "fillers": [
+         *           {
+         *             "word": "um",
+         *             "count": 1
+         *           }
+         *         ],
+         *         "words_per_minute": 67,
+         *         "fillers_per_minute": 13.3,
+         *         "pause_count": 1,
+         *         "longest_pause_seconds": 2.2
+         *       }
+         *     }
+         */
+        TakeSummary: {
+            /** Format: uuid */
+            id: string;
+            question_id: string;
+            /**
+             * Format: date-time
+             * @description When the take was saved, UTC.
+             */
+            created_at: string;
+            duration_seconds: number | null;
+            summary: components["schemas"]["TranscriptSummary"];
+        };
+        TakeList: {
+            /** @description Newest first. */
+            items: components["schemas"]["TakeSummary"][];
+        };
+        Take: {
+            /** Format: uuid */
+            id: string;
+            question_id: string;
+            /** Format: date-time */
+            created_at: string;
+            duration_seconds: number | null;
+            summary: components["schemas"]["TranscriptSummary"];
+            transcript: components["schemas"]["Transcript"];
         };
         /**
          * @description Stable machine-readable code. `not_found` and `method_not_allowed` are for unknown
@@ -373,7 +473,7 @@ export interface components {
          * @example validation_error
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "invalid_host" | "internal_error";
+        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
         /**
          * @example {
          *       "field": "text",
@@ -400,6 +500,51 @@ export interface components {
         };
     };
     responses: {
+        /** @description No take of the signed-in user has this id (deleted, unknown or someone else's). */
+        TakeNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "take_not_found",
+                 *       "detail": "That take doesn't exist any more."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Object storage couldn't be reached; nothing was changed. */
+        StorageUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "storage_unavailable",
+                 *       "detail": "Your saved takes can't be reached right now. Try again in a moment."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description No session token, or one that is invalid, expired or issued to another site. */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "unauthorized",
+                 *       "detail": "Sign in to continue."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description The Host header is not localhost or 127.0.0.1 (DNS-rebinding guard). */
         InvalidHost: {
             headers: {
@@ -485,6 +630,8 @@ export interface components {
     parameters: {
         /** @description The question's UUID. Anything that is not an existing id (malformed included) returns 404. */
         QuestionId: string;
+        /** @description The take's UUID. Anything that is not one of the user's takes returns 404. */
+        TakeId: string;
     };
     requestBodies: never;
     headers: never;
@@ -533,6 +680,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -561,6 +709,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["ValidationError"];
             500: components["responses"]["InternalError"];
@@ -586,6 +735,7 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["QuestionNotFound"];
             500: components["responses"]["InternalError"];
         };
@@ -616,6 +766,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["QuestionNotFound"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["ValidationError"];
@@ -624,7 +775,10 @@ export interface operations {
     };
     createTranscription: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Save the transcript as a take of this question. */
+                questionId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -666,6 +820,8 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["QuestionNotFound"];
             /** @description The body is larger than 25 MB. */
             413: {
                 headers: {
@@ -727,6 +883,87 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    listTakes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The question's UUID. Anything that is not an existing id (malformed included) returns 404. */
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The question's takes, newest first; each without its transcript. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakeList"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["QuestionNotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTake: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The take's UUID. Anything that is not one of the user's takes returns 404. */
+                takeId: components["parameters"]["TakeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The take and its transcript. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Take"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["TakeNotFound"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
+        };
+    };
+    deleteTake: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The take's UUID. Anything that is not one of the user's takes returns 404. */
+                takeId: components["parameters"]["TakeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["TakeNotFound"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
 }

@@ -35,9 +35,11 @@ export async function isServerUp(signal?: AbortSignal): Promise<boolean> {
   }
 }
 
-export function transcribeRecording(audio: Blob): Promise<Transcript> {
+/** With a questionId, the server also saves the transcript as a take of that question (`take_id`). */
+export function transcribeRecording(audio: Blob, questionId?: string): Promise<Transcript> {
   return unwrap(
     client.POST('/api/transcriptions', {
+      params: { query: questionId === undefined ? {} : { questionId } },
       // The contract types the raw audio body as a binary string; send the Blob unchanged.
       body: audio as unknown as string,
       bodySerializer: (body) => body as unknown as Blob,

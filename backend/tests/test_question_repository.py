@@ -16,9 +16,14 @@ CREATED_AT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 UUID4 = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
 
-@pytest.fixture(params=[JsonFileQuestionRepository])
+@pytest.fixture(params=["json", "mysql"])
 def make_repo(request):
-    return request.param
+    """A factory path -> repository; the same path gives a view of the same list."""
+    if request.param == "json":
+        return JsonFileQuestionRepository
+    store = request.getfixturevalue("mysql_store")
+    # Each test's tmp path is a user id of its own, so tests never see each other's rows.
+    return lambda path: store.for_user(str(path))
 
 
 @pytest.fixture

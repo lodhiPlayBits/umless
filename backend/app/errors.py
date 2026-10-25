@@ -15,6 +15,7 @@ ErrorCode = Literal[
     "validation_error",
     "unsupported_media_type",
     "question_not_found",
+    "take_not_found",
     "not_found",
     "method_not_allowed",
     "empty_audio",
@@ -22,7 +23,9 @@ ErrorCode = Literal[
     "unsupported_audio_type",
     "transcription_failed",
     "transcription_unavailable",
+    "storage_unavailable",
     "invalid_host",
+    "unauthorized",
     "internal_error",
 ]
 

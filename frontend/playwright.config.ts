@@ -41,14 +41,15 @@ export default defineConfig({
       command: `${python} -m uvicorn app.main:app --host 127.0.0.1 --port ${API_PORT}`,
       cwd: '../backend',
       url: `http://127.0.0.1:${API_PORT}/api/health`,
-      env: { UMLESS_TRANSCRIBER: 'fake', UMLESS_DATA_FILE: dataFile },
+      // Empty values override backend/.env: no MySQL and no sign-in, just the temp file.
+      env: { UMLESS_TRANSCRIBER: 'fake', UMLESS_DATA_FILE: dataFile, DB_HOST: '', CLERK_PUBLISHABLE_KEY: '' },
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       command: `npx vite --port ${WEB_PORT} --strictPort`,
       url: `http://localhost:${WEB_PORT}`,
-      env: { UMLESS_API_URL: `http://127.0.0.1:${API_PORT}` },
+      env: { UMLESS_API_URL: `http://127.0.0.1:${API_PORT}`, VITE_CLERK_PUBLISHABLE_KEY: '' },
       reuseExistingServer: false,
       timeout: 60_000,
     },
