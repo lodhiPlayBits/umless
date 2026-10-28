@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>umless · Components</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<script src="assets/theme.js"></script>
+<style>
+  .kit-intro { padding-block: var(--space-7) var(--space-5); display: grid; gap: var(--space-3); max-width: 760px; }
+  .kit-panels { display: grid; gap: var(--space-5); padding-bottom: var(--space-8); }
+  @media (min-width: 1280px) { .kit-panels { grid-template-columns: 1fr 1fr; } }
+  .kit-panel { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); display: grid; gap: var(--space-6); align-content: start; min-width: 0; }
+  @media (min-width: 768px) { .kit-panel { padding: var(--space-6); } }
+  .kit-group { display: grid; gap: var(--space-3); min-width: 0; }
+  .kit-group > h3 { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-highlight" viewBox="0 0 24 24"><path d="M4 20h16M6 16l4-12h4l4 12M8 11h8"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<header class="site-header">
+  <div class="container nav">
+    <a class="logo" href="index.html">um<span>less</span></a>
+    <span class="badge">Components</span>
+    <nav class="nav-links" aria-label="Design pages">
+      <a href="landing.html">Landing</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="components.html" aria-current="page">Components</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="btn btn-secondary icon-btn theme-toggle" data-theme-toggle type="button">
+        <svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="kit-intro">
+    <h1 class="text-2xl">Components</h1>
+    <p class="lead">Every building block of the v2 design, shown in both themes side by side. Tokens come from <code>docs/design/tokens.md</code>. The toggle in the header switches this page's own chrome; the two panels below stay fixed to Light and Dark.</p>
+  </div>
+  <div class="kit-panels">
+    <section class="kit-panel" data-theme="light" aria-label="Light theme"><h2 class="text-xl">Light</h2><div class="kit-body stack" style="gap:var(--space-6)"></div></section>
+    <section class="kit-panel" data-theme="dark" aria-label="Dark theme"><h2 class="text-xl">Dark</h2><div class="kit-body stack" style="gap:var(--space-6)"></div></section>
+  </div>
+</main>
+
+<template id="kit">
+  <div class="kit-group">
+    <h3>Buttons</h3>
+    <div class="row">
+      <button class="btn btn-primary" type="button">Start practising</button>
+      <button class="btn btn-secondary" type="button">See how it works</button>
+      <button class="btn btn-ghost" type="button">Log in</button>
+      <button class="btn btn-danger" type="button">Delete</button>
+    </div>
+    <div class="row">
+      <button class="btn btn-record" type="button"><svg class="icon"><use href="#i-mic"/></svg>Start recording</button>
+      <button class="btn btn-primary btn-sm" type="button">Small</button>
+      <button class="btn btn-primary btn-lg" type="button">Large <svg class="icon"><use href="#i-arrow"/></svg></button>
+      <button class="btn btn-primary" type="button" disabled>Disabled</button>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Theme toggle</h3>
+    <div class="row">
+      <button class="btn btn-secondary icon-btn theme-toggle" data-mode="light" type="button" aria-label="Switch to dark mode"><svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg></button>
+      <span class="text-sm muted">in light mode</span>
+      <button class="btn btn-secondary icon-btn theme-toggle" data-mode="dark" type="button" aria-label="Switch to light mode"><svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg></button>
+      <span class="text-sm muted">in dark mode</span>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Inputs</h3>
+    <div class="field">
+      <label class="label">New question</label>
+      <input class="input" placeholder="Tell me about yourself">
+      <span class="hint">Press Enter to add.</span>
+    </div>
+    <div class="field">
+      <label class="label">Email</label>
+      <input class="input" value="gaurav@example" aria-invalid="true">
+      <span class="field-error"><svg class="icon" style="width:16px;height:16px"><use href="#i-alert"/></svg>Enter a full email address, like name@example.com</span>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Badges</h3>
+    <div class="row">
+      <span class="badge">Default</span>
+      <span class="badge badge-primary">New</span>
+      <span class="badge badge-success">Saved</span>
+      <span class="badge badge-warning">Time left 0:59</span>
+      <span class="badge badge-dashed">Hidden until real</span>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Transcript and summary</h3>
+    <div class="card card-surface">
+      <p class="transcript" style="color:var(--color-text)">So, <span class="filler">um</span>, last year I led the move of our billing service. <span class="pause">···</span> The hard part was, <span class="filler">uh</span>, keeping it running.</p>
+      <div class="summary"><span class="badge">1:42 total</span><span class="badge">138 wpm</span><span class="badge">um ×1 · uh ×1</span><span class="badge">1 pause · 3 s</span></div>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Cards</h3>
+    <div class="grid grid-2">
+      <div class="card"><div class="icon-tile"><svg class="icon"><use href="#i-highlight"/></svg></div><h3>Filler words, flagged</h3><p>um, uh and mhmm highlighted in your transcript.</p></div>
+      <div class="card"><span class="step-num">1</span><h3>Add your questions</h3><p>Type the ones you expect to be asked.</p></div>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Pricing card</h3>
+    <div class="price-card featured" style="margin-top:12px">
+      <span class="badge ribbon badge-primary">Most popular</span>
+      <div class="stack" style="gap:4px"><h3 class="text-lg">Pro</h3><p class="muted text-sm">For regular practice.</p></div>
+      <p class="price">₹299 <small>/ month</small></p>
+      <ul class="check-list text-sm"><li>Unlimited takes</li><li>History and progress charts</li></ul>
+      <button class="btn btn-primary btn-block" type="button">Go Pro</button>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>FAQ item</h3>
+    <div class="faq" style="max-width:none">
+      <details open><summary>Which filler words does umless catch?</summary><p class="answer">um, uh and mhmm.</p></details>
+      <details><summary>Is my recording stored?</summary><p class="answer">No.</p></details>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Toast, banner, dialog</h3>
+    <div><span class="toast">Question deleted <button type="button">Undo</button></span></div>
+    <div class="banner banner-danger"><svg class="icon"><use href="#i-alert"/></svg><div class="stack" style="gap:4px"><strong>Can't reach the umless server</strong><span class="text-sm muted">Check your connection, then try again.</span></div></div>
+    <div class="dialog" role="dialog" aria-label="Delete question">
+      <h4 class="text-lg">Delete “Tell me about yourself”?</h4>
+      <p class="muted">This can't be undone.</p>
+      <div class="dialog-actions"><button class="btn btn-secondary" type="button">Cancel</button><button class="btn btn-danger" type="button">Delete</button></div>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Loading and empty</h3>
+    <div class="stack" style="gap:10px"><div class="skeleton" style="width:80%"></div><div class="skeleton" style="width:60%"></div><div class="skeleton" style="width:70%"></div></div>
+    <div class="empty"><div class="icon-tile"><svg class="icon"><use href="#i-plus"/></svg></div><strong>No questions yet</strong><p class="text-sm muted">Add the first question you want to practise.</p></div>
+  </div>
+
+  <div class="kit-group">
+    <h3>App navigation</h3>
+    <nav class="sidebar" aria-label="App" style="border:1px solid var(--color-border);border-radius:var(--radius-lg)">
+      <a class="side-link" href="#" aria-current="page"><svg class="icon"><use href="#i-home"/></svg>Dashboard</a>
+      <a class="side-link" href="#"><svg class="icon"><use href="#i-list"/></svg>Questions</a>
+      <a class="side-link" href="#"><svg class="icon"><use href="#i-history"/></svg>History</a>
+      <a class="side-link" href="#"><svg class="icon"><use href="#i-settings"/></svg>Settings</a>
+    </nav>
+  </div>
+
+  <div class="kit-group">
+    <h3>Stat tiles</h3>
+    <div class="grid grid-2" style="gap:12px">
+      <div class="stat"><span class="stat-label">Fillers per minute</span><span class="stat-value">2.1</span><span class="stat-delta">↓ 0.8 vs last week</span></div>
+      <div class="stat"><span class="stat-label">Average pace</span><span class="stat-value">141 wpm</span><span class="stat-delta" style="color:var(--color-text-muted)">steady</span></div>
+    </div>
+  </div>
+
+  <div class="kit-group">
+    <h3>Recording</h3>
+    <div class="card card-surface" style="justify-items:center;text-align:center">
+      <span class="row text-sm" style="gap:8px"><span class="rec-dot"></span>Recording</span>
+      <span class="timer">01:42</span>
+      <div class="meter" aria-hidden="true"><span style="height:30%"></span><span style="height:60%"></span><span style="height:90%"></span><span style="height:45%"></span><span style="height:75%"></span><span style="height:35%"></span><span style="height:65%"></span><span style="height:20%"></span><span style="height:50%"></span></div>
+      <button class="record-btn" type="button" aria-label="Stop recording"><span class="stop"></span></button>
+      <span class="timer timer-warning" style="font-size:20px;line-height:28px">Time left 0:59</span>
+    </div>
+  </div>
+</template>
+
+<script>
+  // Render the same kit into the Light and Dark panels.
+  var kit = document.getElementById('kit');
+  document.querySelectorAll('.kit-body').forEach(function (body) { body.appendChild(kit.content.cloneNode(true)); });
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>umless · Design v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<script src="assets/theme.js"></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+</svg>
+<header class="site-header">
+  <div class="container nav">
+    <a class="logo" href="index.html">um<span>less</span></a>
+    <span class="badge">Design v2</span>
+    <div class="nav-actions">
+      <button class="btn btn-ghost icon-btn theme-toggle" data-theme-toggle type="button">
+        <svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<main class="container section stack" style="gap:var(--space-6);max-width:880px">
+  <div class="stack" style="gap:var(--space-3)">
+    <h1 class="text-2xl">umless redesign: all screens</h1>
+    <p class="lead">Static design pages for the roadmap in <code>docs/roadmap/2026-10-28-ui-redesign.md</code>. Open any page and use the sun/moon button to switch themes.</p>
+  </div>
+  <div class="grid grid-2">
+    <a class="card" href="components.html" style="text-decoration:none;color:inherit"><span class="badge badge-success">Ready for review</span><h3>Components</h3><p>Every building block in Light and Dark.</p></a>
+    <a class="card" href="landing.html" style="text-decoration:none;color:inherit"><span class="badge badge-success">Ready for review</span><h3>Landing page</h3><p>Hero, how it works, features, privacy, pricing teaser, FAQ, CTA.</p></a>
+    <a class="card" href="pricing.html" style="text-decoration:none;color:inherit"><span class="badge badge-success">Ready for review</span><h3>Pricing</h3><p>Free, Pro and Coach, monthly/yearly switch, comparison, billing FAQ.</p></a>
+    <div class="card card-surface"><span class="badge">Next</span><h3>Auth</h3><p>Sign up, log in, forgot and reset password.</p></div>
+    <div class="card card-surface"><span class="badge">Later</span><h3>App</h3><p>Dashboard, questions, practice and result, history, settings and billing.</p></div>
+  </div>
+</main>
+</body>
+</html>

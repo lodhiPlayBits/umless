@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "design-v2",
+      "runtimeExecutable": "backend/.venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "http.server", "5181", "--bind", "127.0.0.1", "--directory", "docs/design/v2"],
+      "port": 5181
+    }
+  ]
+}
