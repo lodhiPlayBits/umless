@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>umless · Pricing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<script src="assets/theme.js"></script>
+<style>
+  .pricing-head { padding-block: var(--space-8) var(--space-7); text-align: center; display: grid; gap: var(--space-4); justify-items: center; }
+  .plans { display: grid; gap: var(--space-5); grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); align-items: stretch; }
+  .plans .price-card .btn { margin-top: auto; }
+  .save { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--color-success); }
+  .per-year { font-size: 14px; color: var(--color-text-muted); min-height: 20px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+</svg>
+
+<header class="site-header">
+  <div class="container nav">
+    <a class="logo" href="landing.html">um<span>less</span></a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="landing.html#features">Features</a>
+      <a href="landing.html#how">How it works</a>
+      <a href="pricing.html" aria-current="page">Pricing</a>
+      <a href="landing.html#faq">FAQ</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="btn btn-ghost icon-btn theme-toggle" data-theme-toggle type="button">
+        <svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg>
+      </button>
+      <a class="btn btn-ghost btn-sm nav-login" href="#">Log in</a>
+      <a class="btn btn-primary btn-sm" href="#">Start free</a>
+      <details class="nav-menu">
+        <summary class="btn btn-ghost icon-btn" aria-label="Menu"><svg class="icon"><use href="#i-menu"/></svg></summary>
+        <nav class="nav-menu-panel" aria-label="Main">
+          <a href="landing.html#features">Features</a><a href="landing.html#how">How it works</a><a href="pricing.html">Pricing</a><a href="landing.html#faq">FAQ</a><a href="#">Log in</a>
+        </nav>
+      </details>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <section class="pricing-head">
+    <span class="badge badge-dashed">Design note: example prices, to be decided</span>
+    <h1 class="display">Simple pricing. Start free.</h1>
+    <p class="lead" style="max-width:560px">Practise a few answers a month for free. Go Pro when you practise every day.</p>
+    <div class="segmented" role="group" aria-label="Billing period">
+      <button type="button" data-billing="monthly" aria-pressed="true">Monthly</button>
+      <button type="button" data-billing="yearly" aria-pressed="false">Yearly <span class="save">2 months free</span></button>
+    </div>
+  </section>
+
+  <section class="plans" aria-label="Plans">
+    <article class="price-card">
+      <div class="stack" style="gap:4px"><h2 class="text-lg">Free</h2><p class="muted text-sm">For trying it out.</p></div>
+      <div><p class="price">₹0</p><p class="per-year">Free forever</p></div>
+      <ul class="check-list text-sm">
+        <li>10 takes a month</li>
+        <li>Filler, pause and pace detection</li>
+        <li>Summary for every answer</li>
+        <li>Download audio and transcript</li>
+      </ul>
+      <a class="btn btn-secondary btn-block" href="#">Start free</a>
+    </article>
+
+    <article class="price-card featured">
+      <span class="badge ribbon badge-primary">Most popular</span>
+      <div class="stack" style="gap:4px"><h2 class="text-lg">Pro</h2><p class="muted text-sm">For regular practice.</p></div>
+      <div>
+        <p class="price"><span data-price-monthly="₹299" data-price-yearly="₹249">₹299</span> <small>/ month</small></p>
+        <p class="per-year" data-note-monthly="Billed monthly" data-note-yearly="₹2,990 billed yearly">Billed monthly</p>
+      </div>
+      <ul class="check-list text-sm">
+        <li>Unlimited takes</li>
+        <li>Practice history for every question</li>
+        <li>Progress charts: fillers and pace over time</li>
+        <li>Everything in Free</li>
+      </ul>
+      <a class="btn btn-primary btn-block" href="#">Go Pro <svg class="icon"><use href="#i-arrow"/></svg></a>
+    </article>
+
+    <article class="price-card">
+      <div class="stack" style="gap:4px"><h2 class="text-lg">Coach</h2><p class="muted text-sm">For coaches, colleges and bootcamps.</p></div>
+      <div><p class="price" style="font-size:32px;line-height:52px">Let's talk</p><p class="per-year">Priced by number of learners</p></div>
+      <ul class="check-list text-sm">
+        <li>Many learners, one account</li>
+        <li>Shared question sets</li>
+        <li>Invoice billing</li>
+        <li>Everything in Pro</li>
+      </ul>
+      <a class="btn btn-secondary btn-block" href="#">Contact us</a>
+    </article>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2 class="h-section">Compare plans</h2></div>
+    <div class="table-wrap">
+      <table class="compare">
+        <thead><tr><th scope="col">Feature</th><th scope="col">Free</th><th scope="col">Pro</th><th scope="col">Coach</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Takes per month</th><td>10</td><td class="yes">Unlimited</td><td class="yes">Unlimited</td></tr>
+          <tr><th scope="row">Longest answer</th><td>10 min</td><td>10 min</td><td>10 min</td></tr>
+          <tr><th scope="row">Fillers, pauses and pace</th><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><th scope="row">Download audio and transcript</th><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><th scope="row">Practice history</th><td>—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><th scope="row">Progress charts</th><td>—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><th scope="row">Shared question sets</th><td>—</td><td>—</td><td class="yes">✓</td></tr>
+          <tr><th scope="row">Invoice billing</th><td>—</td><td>—</td><td class="yes">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="section-head"><h2 class="h-section">Billing questions</h2></div>
+    <div class="faq">
+      <details open><summary>What counts as a take?</summary><p class="answer">One recording you transcribe. Recording again without transcribing doesn't count.</p></details>
+      <details><summary>Can I cancel any time?</summary><p class="answer">Yes. You keep Pro until the end of the period you've paid for, then move to Free.</p></details>
+      <details><summary>Do unused takes roll over?</summary><p class="answer">No. Free takes reset on the first of each month.</p></details>
+      <details><summary>How can I pay?</summary><p class="answer">Design note: depends on the payment provider (to be decided). Expect UPI and cards.</p></details>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="cta-band">
+      <h2 class="h-section">Try it on your next question</h2>
+      <p class="lead">Free, no card needed.</p>
+      <a class="btn btn-primary btn-lg" href="#">Start practising free <svg class="icon"><use href="#i-arrow"/></svg></a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="stack" style="gap:var(--space-3)"><a class="logo" href="landing.html">um<span>less</span></a><p class="text-sm muted">Practise out loud. Say less um.</p></div>
+      <div><h4>Product</h4><ul><li><a href="landing.html#features">Features</a></li><li><a href="pricing.html">Pricing</a></li><li><a href="landing.html#faq">FAQ</a></li></ul></div>
+      <div><h4>Company</h4><ul><li><a href="#">About</a></li><li><a href="#">Contact</a></li></ul></div>
+      <div><h4>Legal</h4><ul><li><a href="#">Privacy</a></li><li><a href="#">Terms</a></li></ul></div>
+    </div>
+    <div class="footer-bottom"><span>© 2026 umless</span><span>Made for people who practise out loud.</span></div>
+  </div>
+</footer>
+
+<script>
+  // Monthly / yearly switch: swaps the Pro price and its billing note.
+  document.querySelectorAll('[data-billing]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var period = button.dataset.billing;
+      document.querySelectorAll('[data-billing]').forEach(function (b) { b.setAttribute('aria-pressed', String(b === button)); });
+      document.querySelectorAll('[data-price-monthly]').forEach(function (el) { el.textContent = el.dataset['price' + (period === 'yearly' ? 'Yearly' : 'Monthly')]; });
+      document.querySelectorAll('[data-note-monthly]').forEach(function (el) { el.textContent = el.dataset['note' + (period === 'yearly' ? 'Yearly' : 'Monthly')]; });
+    });
+  });
+</script>
+</body>
+</html>

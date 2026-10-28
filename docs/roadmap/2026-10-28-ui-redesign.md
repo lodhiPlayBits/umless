@@ -1,6 +1,15 @@
 # Roadmap: UI/UX redesign (marketing site, pricing, dashboard)
 
-Date: 2026-10-28 · Status: draft, waiting for approval
+Date: 2026-10-28 · Status: approved 2026-10-28; Phases 0–1 built in Figma, not yet visually checked
+
+## Progress
+
+- 2026-10-28: Decisions: keep the indigo accent, use Inter (Geist Mono for the timer).
+- 2026-10-28: The Figma file is on the Starter plan: 3 pages, 1 variable mode per collection, and a cap on MCP tool calls. Workarounds:
+  - Pages are `Design system`, `Marketing & Auth` and `App`, with Sections inside them instead of separate pages.
+  - Dark mode uses two collections, `Color · Light` and `Color · Dark`, with the same 14 token names. Dark frames are made by cloning the Light frame and swapping its variables.
+- 2026-10-28: Built: variables (24 primitives, 14 colour tokens per theme, 15 layout tokens with `var(--…)` code syntax), 11 text styles, 3 shadow styles, and the Cover, Moodboard and Foundations (Light and Dark) sections. Not yet screenshot-checked, because the MCP call limit was reached.
+- 2026-10-28: The Starter plan allows 20 MCP calls a month, so design moved to static HTML in `docs/design/v2/` (same tokens, real light/dark toggle). The Figma file stays as a reference. Done: `assets/theme.css` and `assets/theme.js`, `components.html`, `landing.html`, `pricing.html`, and the `index.html` hub. Preview with the `design-v2` entry in `.claude/launch.json` (port 5181). Next: auth, then the app screens.
 
 ## Goal
 
