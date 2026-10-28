@@ -42,6 +42,10 @@ class Settings:
     oci_namespace: str | None = None
     oci_bucket: str | None = None
     oci_region: str | None = None
+    # Set (from RAZORPAY_*): transcription is metered and paid for. Unset: unmetered (local use).
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = field(default=None, repr=False)
+    razorpay_webhook_secret: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(cls, env_files: tuple[Path, ...] = ENV_FILES) -> "Settings":
@@ -78,6 +82,13 @@ class Settings:
         # Takes in the database would point at transcripts lost on every restart.
         if database is not None and not bucket["OCI_BUCKET"]:
             raise ValueError("DB_HOST is set, so OCI_BUCKET, OCI_NAMESPACE and OCI_REGION must be set too")
+        key_id = (values.get("RAZORPAY_KEY_ID") or "").strip()
+        key_secret = (values.get("RAZORPAY_KEY_SECRET") or "").strip()
+        if bool(key_id) != bool(key_secret):
+            raise ValueError("Set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or neither")
+        # A public, multi-user server must never hand out unmetered (unpaid) transcription.
+        if database is not None and not key_id:
+            raise ValueError("DB_HOST is set, so RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set too")
         return cls(
             deepgram_api_key=values.get("DEEPGRAM_API_KEY") or None,
             transcriber=transcriber,
@@ -88,6 +99,9 @@ class Settings:
             oci_namespace=bucket["OCI_NAMESPACE"] or None,
             oci_bucket=bucket["OCI_BUCKET"] or None,
             oci_region=bucket["OCI_REGION"] or None,
+            razorpay_key_id=key_id or None,
+            razorpay_key_secret=key_secret or None,
+            razorpay_webhook_secret=(values.get("RAZORPAY_WEBHOOK_SECRET") or "").strip() or None,
         )
 
 

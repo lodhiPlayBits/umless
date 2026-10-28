@@ -5,6 +5,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from fastapi.testclient import TestClient
 
+import app.billing.sql  # noqa: F401  (registers the billing tables in metadata)
 import app.takes.sql  # noqa: F401  (registers the takes table in metadata)
 from app.config import Settings, database_url
 from app.db import metadata

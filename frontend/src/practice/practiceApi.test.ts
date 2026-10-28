@@ -14,6 +14,14 @@ describe('transcribeFailure', () => {
     expect(transcribeFailure(err(500)).title).toBe("Can't reach the umless server")
   })
 
+  it('maps 402 payment_required to "out of practice time", with a way to buy more', () => {
+    expect(transcribeFailure(err(402, 'payment_required'))).toMatchObject({
+      title: "You're out of practice time",
+      canRetry: true,
+      needsTime: true,
+    })
+  })
+
   it('maps 502 transcription_failed to "Transcription failed", retryable', () => {
     expect(transcribeFailure(err(502, 'transcription_failed'))).toMatchObject({ title: 'Transcription failed', canRetry: true })
   })

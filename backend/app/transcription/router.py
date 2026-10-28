@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.concurrency import run_in_threadpool
 
 from app.auth import get_user_id
+from app.billing.router import get_billing
+from app.billing.store import BillingStore
 from app.config import Settings
 from app.errors import ApiError
 from app.http import get_settings, media_type
@@ -60,6 +62,7 @@ async def transcribe(
     user_id: str = Depends(get_user_id),
     settings: Settings = Depends(get_settings),
     transcriber: Transcriber = Depends(get_transcriber),
+    billing: BillingStore | None = Depends(get_billing),
 ) -> dict:
     # Only the normalized base type is forwarded; Deepgram detects the codec itself.
     content_type = media_type(request)
@@ -80,6 +83,14 @@ async def transcribe(
         if question is None:
             raise question_not_found()
 
+    # Checked before the paid Deepgram call too.
+    if billing is not None:
+        balance = await run_in_threadpool(billing.balance, user_id)
+        if not balance.can_transcribe:
+            raise ApiError(
+                402, "payment_required", "You're out of practice time. Buy a session to keep going."
+            )
+
     audio = await read_body_capped(request, settings.max_body_bytes)
     if not audio:
         raise ApiError(400, "empty_audio", "The recording is empty.")
@@ -96,9 +107,22 @@ async def transcribe(
             502, "transcription_failed", "Transcription failed. Try again in a moment."
         ) from None
 
+    if billing is not None and body["words"]:
+        await charge(billing, user_id, body)
     if question is not None:
         body["take_id"] = await save_take(get_take_history(request, user_id), question, body)
     return body
+
+
+async def charge(billing: BillingStore, user_id: str, body: dict) -> None:
+    """Use a free transcription, or deduct the recording's length. Only takes with words are
+    charged. A failure is logged, not shown: the user already has the transcript."""
+    words = body["words"]
+    seconds = body["duration_seconds"] or (words[-1]["end"] if words else 0)
+    try:
+        await run_in_threadpool(billing.charge, user_id, seconds)
+    except Exception:
+        logger.exception("Couldn't charge %s for a transcription", user_id)
 
 
 async def save_take(history: TakeHistory, question: Question, body: dict) -> str | None:

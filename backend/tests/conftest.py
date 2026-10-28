@@ -12,6 +12,8 @@ from app.config import Settings
 from app.main import create_app
 from app.questions.repository import JsonFileQuestionRepository
 from app.questions.router import get_question_repository
+from app.billing.router import get_billing
+from app.billing.store import InMemoryBillingStore, Order
 from app.db import create_mysql_engine
 from app.questions.sql import SqlQuestionStore
 from app.takes.objects import InMemoryObjects
@@ -95,6 +97,15 @@ def contract_schema(tmp_path_factory):
     app.state.questions = repository  # createTranscription saving a take reads it directly
     app.state.takes = InMemoryTakeStore()
     app.state.transcripts = InMemoryObjects()
+    # Metered, so the payment operations and 402 are exercised; orders never reach Razorpay.
+    from tests.test_billing import FakeRazorpay
+
+    app.state.razorpay = FakeRazorpay()
+    # Plenty of paid time, so fuzzed transcriptions never run out (402 has its own tests).
+    billing = InMemoryBillingStore()
+    billing.add_order(Order("order_contract", "user_alice", "session_5", 12000, 10**9, "created"))
+    billing.mark_paid("order_contract", "pay_contract")
+    app.dependency_overrides[get_billing] = lambda: billing
     schema = schemathesis.openapi.from_path(OPENAPI)
     schema.app = app
     # The Host guard only accepts localhost, so don't use the contract's 127.0.0.1:8000 server.

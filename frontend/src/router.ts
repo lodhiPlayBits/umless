@@ -1,13 +1,18 @@
 import { useEffect, useSyncExternalStore } from 'react'
+import { LEGAL_PAGES } from './legal/business'
+import type { LegalPageId } from './legal/business'
 
 // A small router on the History API: the app has only three kinds of page (docs/design/screens.md).
 export type Route =
   | { name: 'questions' }
   | { name: 'practice'; questionId: string }
+  | { name: 'legal'; page: LegalPageId }
   | { name: 'notFound' }
 
 export function parseRoute(pathname: string): Route {
   if (pathname === '/') return { name: 'questions' }
+  const legal = LEGAL_PAGES.find((page) => pathname.replace(/\/$/, '') === `/${page.id}`)
+  if (legal) return { name: 'legal', page: legal.id }
   const practice = /^\/practice\/([^/]+)\/?$/.exec(pathname)
   if (practice) {
     try {

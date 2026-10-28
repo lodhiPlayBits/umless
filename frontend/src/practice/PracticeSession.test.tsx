@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resetAccount, setAccount } from '../billing/account'
 import { ApiError } from '../client'
 import { RecorderError } from '../recorder'
 import type { AutoStopReason, Recording } from '../recorder'
@@ -426,5 +427,26 @@ describe('PracticeSession saved takes', () => {
     const s = await transcribed(null)
     await s.user.click(screen.getByRole('button', { name: 'Practise again' }))
     expect(within(screen.getByRole('alertdialog')).getByText(/aren't stored anywhere/)).toBeInTheDocument()
+  })
+})
+
+describe('PracticeSession out of practice time', () => {
+  afterEach(() => resetAccount())
+
+  it('offers to buy time, then Try again on the same recording', async () => {
+    setAccount({ metered: true, free_transcriptions_left: 0, seconds_left: 0, packs: [] })
+    const transcribe = vi.fn().mockRejectedValueOnce(new ApiError('x', 402, 'payment_required')).mockResolvedValue(transcript)
+    const s = setup({ transcribe })
+    await record(s)
+    await s.user.click(screen.getByRole('button', { name: 'Transcribe' }))
+
+    expect(await screen.findByText("You're out of practice time")).toBeInTheDocument()
+    await s.user.click(screen.getByRole('button', { name: 'Buy practice time' }))
+    expect(within(screen.getByRole('alertdialog')).getByText('Buy practice time')).toBeInTheDocument()
+    await s.user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Not now' }))
+
+    await s.user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('How it went')).toBeInTheDocument()
+    expect(transcribe).toHaveBeenCalledTimes(2)
   })
 })

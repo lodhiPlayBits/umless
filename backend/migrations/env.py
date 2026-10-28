@@ -10,6 +10,7 @@ from app.db import create_mysql_engine, metadata
 # Imported for their tables, which register themselves in metadata.
 import app.questions.sql  # noqa: E402,F401
 import app.takes.sql  # noqa: E402,F401
+import app.billing.sql  # noqa: E402,F401
 
 config = context.config
 if config.config_file_name is not None:

@@ -76,6 +76,14 @@ The backend reaches the OCI bucket as its VM (instance principal), so there are 
    ```
 3. Set `OCI_NAMESPACE`, `OCI_BUCKET` and `OCI_REGION` in `backend/.env` and rebuild the backend. Policies take a minute or two to apply.
 
+## Deploy: payments (Razorpay)
+
+Each account gets 3 free transcriptions, then buys practice time (`docs/adr/0004-razorpay-billing.md`).
+
+1. Put `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `backend/.env` (test keys `rzp_test_…` until going live).
+2. In the Razorpay dashboard → Webhooks → Add: URL `https://umless.in/api/payments/webhook`, events `payment.captured` and `order.paid`, and a secret; put that secret in `RAZORPAY_WEBHOOK_SECRET`.
+3. Rebuild the backend. Test with Razorpay's test cards or UPI `success@razorpay`.
+
 ## Known limitations
 
 - Chrome's WebM recordings have no duration or seek metadata, so players may show an unknown length. Fixing it needs ffmpeg, which is out of scope for the MVP.

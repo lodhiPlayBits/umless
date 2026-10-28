@@ -18,6 +18,14 @@ describe('parseRoute', () => {
     expect(parseRoute('/practice/%E0%A4%A')).toEqual({ name: 'notFound' })
   })
 
+  it('maps the legal pages, with or without a trailing slash', () => {
+    expect(parseRoute('/terms')).toEqual({ name: 'legal', page: 'terms' })
+    expect(parseRoute('/privacy/')).toEqual({ name: 'legal', page: 'privacy' })
+    expect(parseRoute('/refunds')).toEqual({ name: 'legal', page: 'refunds' })
+    expect(parseRoute('/contact')).toEqual({ name: 'legal', page: 'contact' })
+    expect(parseRoute('/terms/x')).toEqual({ name: 'notFound' })
+  })
+
   it('treats unknown paths as not found', () => {
     expect(parseRoute('/nope')).toEqual({ name: 'notFound' })
     expect(parseRoute('/practice')).toEqual({ name: 'notFound' })

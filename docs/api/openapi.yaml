@@ -26,6 +26,8 @@ tags:
     description: The signed-in user's practice questions (MySQL, or a JSON file locally)
   - name: transcriptions
     description: Speech-to-text through Deepgram; the audio is never stored
+  - name: billing
+    description: Practice time (free transcriptions, then paid minutes) and Razorpay payments
   - name: takes
     description: The signed-in user's saved transcripts, per question (records in MySQL, transcripts in object storage)
 
@@ -215,6 +217,11 @@ paths:
         signed-in user's questions, checked before Deepgram is called; otherwise 404) and the
         response's `take_id` names it. If saving fails the transcript is still returned, with
         `take_id: null`.
+
+        On a metered server (getAccount `metered`), the user needs a free transcription or paid
+        time left, checked before Deepgram is called (otherwise 402). A transcript with words
+        then uses one free transcription, or deducts its length (rounded up to a second) from
+        paid time, never below zero. A transcript with no words is free.
       x-screen:
         - practice-review / transcribe recording
         - practice-transcribe-error / retry transcription
@@ -277,6 +284,15 @@ paths:
                 detail: The recording is larger than 25 MB.
         '404':
           $ref: '#/components/responses/QuestionNotFound'
+        '402':
+          description: No free transcriptions or paid time left.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: payment_required
+                detail: You're out of practice time. Buy a session to keep going.
         '415':
           description: The Content-Type is missing or not one of the accepted audio types.
           content:
@@ -378,6 +394,166 @@ paths:
         '503':
           $ref: '#/components/responses/StorageUnavailable'
 
+  /api/account:
+    get:
+      operationId: getAccount
+      tags: [billing]
+      summary: The signed-in user's practice time and the packs on sale
+      x-screen:
+        - header / practice time left
+        - buy-time / pack choices
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The balance. On an unmetered server (local use) `metered` is false.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/payments/orders:
+    post:
+      operationId: createPaymentOrder
+      tags: [billing]
+      summary: Start buying a pack (creates a Razorpay order)
+      description: |
+        The amount comes from the server's price list, never from the client. The response has
+        what Razorpay Checkout needs to open.
+      x-screen:
+        - buy-time / buy pack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentOrderCreate'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '201':
+          description: The order, ready for Checkout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOrder'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/PaymentProviderFailed'
+        '503':
+          $ref: '#/components/responses/PaymentsUnavailable'
+
+  /api/payments/verify:
+    post:
+      operationId: verifyPayment
+      tags: [billing]
+      summary: Confirm a Checkout payment and add its time
+      description: |
+        Checks Razorpay's signature (HMAC-SHA256 of `order_id|payment_id` with the key secret),
+        then asks Razorpay that the payment belongs to the order, has its amount and is captured
+        (capturing an authorized one). Only then is the order's time credited, once; verifying a
+        paid order again changes nothing.
+      x-screen:
+        - buy-time / payment succeeded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentVerify'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The new balance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          description: The signature doesn't match or the payment isn't captured (`payment_invalid`), or a bad Host header.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: payment_invalid
+                detail: This payment couldn't be verified.
+        '404':
+          description: No order of the signed-in user has this id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: order_not_found
+                detail: That payment order doesn't exist.
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/PaymentProviderFailed'
+        '503':
+          $ref: '#/components/responses/PaymentsUnavailable'
+
+  /api/payments/webhook:
+    post:
+      operationId: razorpayWebhook
+      tags: [billing]
+      summary: Razorpay's payment notification (server to server)
+      description: |
+        Called by Razorpay, not the browser, so it needs no sign-in: the
+        `X-Razorpay-Signature` header (HMAC-SHA256 of the raw body with the webhook secret)
+        proves it. `payment.captured` and `order.paid` credit a known order whose amount
+        matches, once; anything else is acknowledged and ignored.
+      security: []
+      parameters:
+        - name: X-Razorpay-Signature
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Acknowledged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '400':
+          description: The signature is missing or wrong (`payment_invalid`), or a bad Host header.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: payment_invalid
+                detail: This payment couldn't be verified.
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/PaymentsUnavailable'
+
 components:
   parameters:
     QuestionId:
@@ -413,6 +589,24 @@ components:
         `sub` is the user id that owns the questions.
 
   responses:
+    PaymentsUnavailable:
+      description: This server has no Razorpay keys (or, for the webhook, no webhook secret).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: payments_unavailable
+            detail: Payments aren't set up on this server.
+    PaymentProviderFailed:
+      description: Razorpay couldn't be reached or refused the order.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: payment_provider_failed
+            detail: The payment couldn't be started. Try again in a moment.
     TakeNotFound:
       description: No take of the signed-in user has this id (deleted, unknown or someone else's).
       content:
@@ -868,6 +1062,128 @@ components:
         transcript:
           $ref: '#/components/schemas/Transcript'
 
+    Pack:
+      type: object
+      additionalProperties: false
+      required: [id, label, seconds, amount_paise, currency]
+      properties:
+        id:
+          type: string
+          enum: [session_1, session_5]
+        label:
+          type: string
+          minLength: 1
+        seconds:
+          type: integer
+          minimum: 1
+          description: Practice time the pack adds.
+        amount_paise:
+          type: integer
+          minimum: 100
+          description: Price in the currency's smallest unit (paise).
+        currency:
+          type: string
+          enum: [INR]
+
+    Account:
+      type: object
+      additionalProperties: false
+      required: [metered, free_transcriptions_left, seconds_left, packs]
+      properties:
+        metered:
+          type: boolean
+          description: False on a server without payments (local use); then nothing is counted.
+        free_transcriptions_left:
+          type: integer
+          minimum: 0
+        seconds_left:
+          type: integer
+          minimum: 0
+          description: Paid practice time left.
+        packs:
+          type: array
+          description: What can be bought; empty when not metered.
+          items:
+            $ref: '#/components/schemas/Pack'
+      example:
+        metered: true
+        free_transcriptions_left: 0
+        seconds_left: 3540
+        packs:
+          - id: session_1
+            label: 1 session · 60 minutes
+            seconds: 3600
+            amount_paise: 4000
+            currency: INR
+          - id: session_5
+            label: 5 sessions · 300 minutes
+            seconds: 18000
+            amount_paise: 12000
+            currency: INR
+
+    PaymentOrderCreate:
+      type: object
+      additionalProperties: false
+      required: [pack_id]
+      properties:
+        pack_id:
+          type: string
+          enum: [session_1, session_5]
+
+    PaymentOrder:
+      type: object
+      additionalProperties: false
+      required: [order_id, key_id, amount_paise, currency, pack_id, label]
+      properties:
+        order_id:
+          type: string
+          minLength: 1
+          description: Razorpay's order id, for Checkout.
+        key_id:
+          type: string
+          minLength: 1
+          description: The public Razorpay key id, for Checkout.
+        amount_paise:
+          type: integer
+          minimum: 100
+        currency:
+          type: string
+          enum: [INR]
+        pack_id:
+          type: string
+          enum: [session_1, session_5]
+        label:
+          type: string
+          minLength: 1
+
+    PaymentVerify:
+      type: object
+      additionalProperties: false
+      required: [order_id, payment_id, signature]
+      description: What Razorpay Checkout's success handler returns.
+      properties:
+        order_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+        payment_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+        signature:
+          type: string
+          minLength: 1
+          maxLength: 256
+
+    WebhookAck:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, ignored]
+
     ErrorCode:
       type: string
       enum:
@@ -875,6 +1191,11 @@ components:
         - unsupported_media_type
         - question_not_found
         - take_not_found
+        - order_not_found
+        - payment_required
+        - payment_invalid
+        - payment_provider_failed
+        - payments_unavailable
         - not_found
         - method_not_allowed
         - empty_audio

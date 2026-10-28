@@ -105,6 +105,11 @@ export interface paths {
          *     signed-in user's questions, checked before Deepgram is called; otherwise 404) and the
          *     response's `take_id` names it. If saving fails the transcript is still returned, with
          *     `take_id: null`.
+         *
+         *     On a metered server (getAccount `metered`), the user needs a free transcription or paid
+         *     time left, checked before Deepgram is called (otherwise 402). A transcript with words
+         *     then uses one free transcription, or deducts its length (rounded up to a second) from
+         *     paid time, never below zero. A transcript with no words is free.
          */
         post: operations["createTranscription"];
         delete?: never;
@@ -149,6 +154,90 @@ export interface paths {
         post?: never;
         /** Delete a saved take and its transcript */
         delete: operations["deleteTake"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user's practice time and the packs on sale */
+        get: operations["getAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start buying a pack (creates a Razorpay order)
+         * @description The amount comes from the server's price list, never from the client. The response has
+         *     what Razorpay Checkout needs to open.
+         */
+        post: operations["createPaymentOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a Checkout payment and add its time
+         * @description Checks Razorpay's signature (HMAC-SHA256 of `order_id|payment_id` with the key secret),
+         *     then asks Razorpay that the payment belongs to the order, has its amount and is captured
+         *     (capturing an authorized one). Only then is the order's time credited, once; verifying a
+         *     paid order again changes nothing.
+         */
+        post: operations["verifyPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Razorpay's payment notification (server to server)
+         * @description Called by Razorpay, not the browser, so it needs no sign-in: the
+         *     `X-Razorpay-Signature` header (HMAC-SHA256 of the raw body with the webhook secret)
+         *     proves it. `payment.captured` and `order.paid` credit a known order whose amount
+         *     matches, once; anything else is acknowledged and ignored.
+         */
+        post: operations["razorpayWebhook"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -467,13 +556,82 @@ export interface components {
             summary: components["schemas"]["TranscriptSummary"];
             transcript: components["schemas"]["Transcript"];
         };
+        Pack: {
+            /** @enum {string} */
+            id: "session_1" | "session_5";
+            label: string;
+            /** @description Practice time the pack adds. */
+            seconds: number;
+            /** @description Price in the currency's smallest unit (paise). */
+            amount_paise: number;
+            /** @enum {string} */
+            currency: "INR";
+        };
+        /**
+         * @example {
+         *       "metered": true,
+         *       "free_transcriptions_left": 0,
+         *       "seconds_left": 3540,
+         *       "packs": [
+         *         {
+         *           "id": "session_1",
+         *           "label": "1 session · 60 minutes",
+         *           "seconds": 3600,
+         *           "amount_paise": 4000,
+         *           "currency": "INR"
+         *         },
+         *         {
+         *           "id": "session_5",
+         *           "label": "5 sessions · 300 minutes",
+         *           "seconds": 18000,
+         *           "amount_paise": 12000,
+         *           "currency": "INR"
+         *         }
+         *       ]
+         *     }
+         */
+        Account: {
+            /** @description False on a server without payments (local use); then nothing is counted. */
+            metered: boolean;
+            free_transcriptions_left: number;
+            /** @description Paid practice time left. */
+            seconds_left: number;
+            /** @description What can be bought; empty when not metered. */
+            packs: components["schemas"]["Pack"][];
+        };
+        PaymentOrderCreate: {
+            /** @enum {string} */
+            pack_id: "session_1" | "session_5";
+        };
+        PaymentOrder: {
+            /** @description Razorpay's order id, for Checkout. */
+            order_id: string;
+            /** @description The public Razorpay key id, for Checkout. */
+            key_id: string;
+            amount_paise: number;
+            /** @enum {string} */
+            currency: "INR";
+            /** @enum {string} */
+            pack_id: "session_1" | "session_5";
+            label: string;
+        };
+        /** @description What Razorpay Checkout's success handler returns. */
+        PaymentVerify: {
+            order_id: string;
+            payment_id: string;
+            signature: string;
+        };
+        WebhookAck: {
+            /** @enum {string} */
+            status: "ok" | "ignored";
+        };
         /**
          * @description Stable machine-readable code. `not_found` and `method_not_allowed` are for unknown
          *     routes and wrong methods; the rest map to the documented responses.
          * @example validation_error
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
+        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
         /**
          * @example {
          *       "field": "text",
@@ -500,6 +658,36 @@ export interface components {
         };
     };
     responses: {
+        /** @description This server has no Razorpay keys (or, for the webhook, no webhook secret). */
+        PaymentsUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "payments_unavailable",
+                 *       "detail": "Payments aren't set up on this server."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Razorpay couldn't be reached or refused the order. */
+        PaymentProviderFailed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "payment_provider_failed",
+                 *       "detail": "The payment couldn't be started. Try again in a moment."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description No take of the signed-in user has this id (deleted, unknown or someone else's). */
         TakeNotFound: {
             headers: {
@@ -821,6 +1009,21 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            /** @description No free transcriptions or paid time left. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "payment_required",
+                     *       "detail": "You're out of practice time. Buy a session to keep going."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             404: components["responses"]["QuestionNotFound"];
             /** @description The body is larger than 25 MB. */
             413: {
@@ -964,6 +1167,163 @@ export interface operations {
             404: components["responses"]["TakeNotFound"];
             500: components["responses"]["InternalError"];
             503: components["responses"]["StorageUnavailable"];
+        };
+    };
+    getAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The balance. On an unmetered server (local use) `metered` is false. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createPaymentOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentOrderCreate"];
+            };
+        };
+        responses: {
+            /** @description The order, ready for Checkout. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOrder"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["PaymentProviderFailed"];
+            503: components["responses"]["PaymentsUnavailable"];
+        };
+    };
+    verifyPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentVerify"];
+            };
+        };
+        responses: {
+            /** @description The new balance. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            /** @description The signature doesn't match or the payment isn't captured (`payment_invalid`), or a bad Host header. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "payment_invalid",
+                     *       "detail": "This payment couldn't be verified."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description No order of the signed-in user has this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "order_not_found",
+                     *       "detail": "That payment order doesn't exist."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["PaymentProviderFailed"];
+            503: components["responses"]["PaymentsUnavailable"];
+        };
+    };
+    razorpayWebhook: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Razorpay-Signature"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Acknowledged. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+            /** @description The signature is missing or wrong (`payment_invalid`), or a bad Host header. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "payment_invalid",
+                     *       "detail": "This payment couldn't be verified."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["PaymentsUnavailable"];
         };
     };
 }

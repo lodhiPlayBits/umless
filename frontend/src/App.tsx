@@ -1,5 +1,7 @@
 import { PageCrash } from './AppCrash'
 import ErrorBoundary from './components/ErrorBoundary'
+import Footer from './legal/Footer'
+import LegalPage from './legal/LegalPage'
 import Link from './Link'
 import NotFound from './NotFound'
 import PracticeRoute from './practice/PracticeRoute'
@@ -18,7 +20,7 @@ function App() {
           um<span>less</span>
         </Link>
         <div className="header-end">
-          {route.name === 'practice' && (
+          {(route.name === 'practice' || route.name === 'legal') && (
             <nav aria-label="Practice">
               <Link to="/">← Questions</Link>
             </nav>
@@ -31,9 +33,11 @@ function App() {
         <ErrorBoundary key={pathname} fallback={<PageCrash showBack={route.name !== 'questions'} />}>
           {route.name === 'questions' && <QuestionsScreen />}
           {route.name === 'practice' && <PracticeRoute key={route.questionId} questionId={route.questionId} />}
+          {route.name === 'legal' && <LegalPage page={route.page} />}
           {route.name === 'notFound' && <NotFound />}
         </ErrorBoundary>
       </main>
+      <Footer />
     </>
   )
 }

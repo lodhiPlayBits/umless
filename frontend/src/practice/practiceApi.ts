@@ -53,6 +53,8 @@ export interface TranscribeFailure {
   detail: string
   /** False when trying the same recording again can't help (too large, or not set up). */
   canRetry: boolean
+  /** Out of practice time: offer to buy more, then Try again. */
+  needsTime?: boolean
 }
 
 /** One message per cause (docs/design/flows.md E8–E11, wireframe practice-transcribe-error). */
@@ -74,6 +76,14 @@ export function transcribeFailure(error: unknown): TranscribeFailure {
       title: "Transcription isn't set up",
       detail: 'Add DEEPGRAM_API_KEY to the backend .env, restart it, then try again.',
       canRetry: true,
+    }
+  }
+  if (code === 'payment_required') {
+    return {
+      title: "You're out of practice time",
+      detail: 'Buy more time, then press Try again. Your recording is safe in this tab.',
+      canRetry: true,
+      needsTime: true,
     }
   }
   if (code === 'audio_too_large') {

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { refreshAccountIfShown } from '../billing/account'
+import BuyTime from '../billing/BuyTime'
 import { ApiError } from '../client'
 import ChoiceDialog from '../components/ChoiceDialog'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -72,6 +74,7 @@ export default function PracticeSession({
   // E14: where to go once the user confirms leaving an unsaved take ('again' = Practise again here).
   const [unsavedLeave, setUnsavedLeave] = useState<string | null>(null)
   const [toast, setToast] = useState<ToastMessage | null>(null)
+  const [buyingTime, setBuyingTime] = useState(false)
   const dismissToast = useCallback(() => setToast(null), [])
   const handleRef = useRef<RecorderHandle | null>(null)
   const stoppingRef = useRef(false)
@@ -168,6 +171,8 @@ export default function PracticeSession({
       // The question id saves the transcript as a take of this question.
       const transcript = await transcribe(current.recording.blob, practice.question.id)
       if (mountedRef.current) setStage({ name: 'result', take: current, transcript })
+      // The header's practice time just went down.
+      refreshAccountIfShown()
     } catch (error) {
       if (!mountedRef.current) return
       if (error instanceof ApiError && error.code === 'empty_audio') setStage({ name: 'empty' })
@@ -376,7 +381,17 @@ export default function PracticeSession({
           )}
 
           {stage.name === 'transcribe-error' && (
-            <ErrorBanner title={stage.failure.title} detail={stage.failure.detail} />
+            <ErrorBanner
+              title={stage.failure.title}
+              detail={stage.failure.detail}
+              actions={
+                stage.failure.needsTime && (
+                  <button type="button" className="btn btn-primary" onClick={() => setBuyingTime(true)}>
+                    Buy practice time
+                  </button>
+                )
+              }
+            />
           )}
 
           {stage.name === 'review' && <p className="hint">Not saved anywhere yet. Transcribe it, or download the audio to keep it.</p>}
@@ -452,6 +467,15 @@ export default function PracticeSession({
       )}
 
       <Toast toast={toast} onDismiss={dismissToast} />
+
+      {buyingTime && (
+        <BuyTime
+          onDone={(message) => {
+            setBuyingTime(false)
+            if (message) setToast({ id: Date.now(), text: `${message} Press Try again to transcribe.` })
+          }}
+        />
+      )}
 
       {leaveTarget !== undefined && stage.name === 'recording' && (
         <ChoiceDialog
