@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>umless · Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<link rel="stylesheet" href="assets/app.css">
+<script src="assets/theme.js"></script>
+<script src="assets/states.js"></script>
+</head>
+<body data-states="returning:Returning user,first:First visit">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+</svg>
+
+<div class="design-bar">
+  <div class="container inner">
+    <a class="logo" href="index.html" style="font-size:16px">um<span>less</span></a>
+    <span class="label">Design · Dashboard</span>
+    <div class="scroller"><div class="segmented" role="group" aria-label="State" id="state-picker"></div></div>
+    <button class="btn btn-secondary icon-btn theme-toggle" data-theme-toggle type="button"><svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg></button>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="app-sidebar">
+    <a class="logo" href="landing.html">um<span>less</span></a>
+    <nav aria-label="App">
+      <a class="side-link" href="app-dashboard.html" aria-current="page"><svg class="icon"><use href="#i-home"/></svg>Dashboard</a>
+      <a class="side-link" href="app-questions.html"><svg class="icon"><use href="#i-list"/></svg>Questions</a>
+      <a class="side-link" href="app-history.html"><svg class="icon"><use href="#i-history"/></svg>History</a>
+      <a class="side-link" href="app-settings.html"><svg class="icon"><use href="#i-settings"/></svg>Settings</a>
+    </nav>
+    <div class="plan-card">
+      <div class="row" style="justify-content:space-between"><strong class="text-sm">Free plan</strong><span class="text-xs muted" data-when="returning">7 of 10 left</span><span class="text-xs muted" data-when="first">10 of 10 left</span></div>
+      <div class="progress" aria-hidden="true"><span style="width:30%" data-when="returning"></span><span style="width:0%" data-when="first"></span></div>
+      <a class="btn btn-secondary btn-sm btn-block" href="app-settings.html#billing">Upgrade to Pro</a>
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="app-top">
+      <a class="logo" href="landing.html">um<span>less</span></a>
+      <div class="crumbs"><strong>Dashboard</strong></div>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost icon-btn theme-toggle" data-theme-toggle type="button"><svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg></button>
+      <span class="avatar" aria-label="Your account"><svg class="icon" style="width:18px;height:18px"><use href="#i-user"/></svg></span>
+    </header>
+
+    <main class="app-content">
+      <!-- ===== Returning user ===== -->
+      <div class="page-head" data-when="returning">
+        <div class="stack" style="gap:4px"><h1>Welcome back</h1><p class="muted">4 days in a row. Keep it going.</p></div>
+        <a class="btn btn-secondary" href="app-questions.html"><svg class="icon"><use href="#i-plus"/></svg>Add question</a>
+      </div>
+
+      <div class="next-card" data-when="returning">
+        <div class="stack" style="gap:4px"><span class="eyebrow">Practise next · not tried yet</span><p class="q">Tell me about a time you failed.</p></div>
+        <a class="btn btn-primary btn-lg" href="app-practice.html"><svg class="icon"><use href="#i-mic"/></svg>Start practising</a>
+      </div>
+
+      <div class="stats-grid" data-when="returning">
+        <div class="stat"><span class="stat-label">Takes this week</span><span class="stat-value">9</span><span class="stat-delta">↑ 3 vs last week</span></div>
+        <div class="stat"><span class="stat-label">Fillers per minute</span><span class="stat-value">2.1</span><span class="stat-delta">↓ 0.3 vs last week</span></div>
+        <div class="stat"><span class="stat-label">Average pace</span><span class="stat-value">141 <small class="text-sm muted">wpm</small></span><span class="stat-delta" style="color:var(--color-text-muted)">In the 130–160 range</span></div>
+        <div class="stat"><span class="stat-label">Longest pause, average</span><span class="stat-value">2.4 <small class="text-sm muted">s</small></span><span class="stat-delta">↓ 0.6 s vs last week</span></div>
+      </div>
+
+      <div class="dash-grid" data-when="returning">
+        <section class="panel" aria-labelledby="trend-title">
+          <div class="panel-head"><h2 id="trend-title">Fillers per minute</h2><span class="badge">Last 8 weeks</span></div>
+          <svg class="chart" viewBox="0 0 600 220" role="img" aria-label="Fillers per minute fell from 4.2 eight weeks ago to 2.1 this week.">
+            <line class="grid-line" x1="40" y1="20" x2="590" y2="20"/><line class="grid-line" x1="40" y1="60" x2="590" y2="60"/>
+            <line class="grid-line" x1="40" y1="100" x2="590" y2="100"/><line class="grid-line" x1="40" y1="140" x2="590" y2="140"/>
+            <line class="grid-line" x1="40" y1="180" x2="590" y2="180"/>
+            <text x="30" y="24" text-anchor="end">4</text><text x="30" y="64" text-anchor="end">3</text><text x="30" y="104" text-anchor="end">2</text><text x="30" y="144" text-anchor="end">1</text><text x="30" y="184" text-anchor="end">0</text>
+            <polygon class="area" points="60,12 135,28 210,24 285,56 360,64 435,76 510,84 580,96 580,180 60,180"/>
+            <polyline class="line" points="60,12 135,28 210,24 285,56 360,64 435,76 510,84 580,96"/>
+            <circle class="point" cx="60" cy="12" r="4"/><circle class="point" cx="135" cy="28" r="4"/><circle class="point" cx="210" cy="24" r="4"/><circle class="point" cx="285" cy="56" r="4"/>
+            <circle class="point" cx="360" cy="64" r="4"/><circle class="point" cx="435" cy="76" r="4"/><circle class="point" cx="510" cy="84" r="4"/><circle class="point" cx="580" cy="96" r="5"/>
+            <text x="60" y="205" text-anchor="middle">Sep 7</text><text x="210" y="205" text-anchor="middle">Sep 21</text><text x="360" y="205" text-anchor="middle">Oct 5</text><text x="510" y="205" text-anchor="middle">Oct 19</text><text x="580" y="205" text-anchor="end">Now</text>
+          </svg>
+          <p class="text-sm muted">Down from 4.2 to 2.1: half as many fillers as when you started.</p>
+        </section>
+
+        <section class="panel" aria-labelledby="recent-title" style="align-content:start">
+          <div class="panel-head"><h2 id="recent-title">Recent takes</h2><a class="text-sm" href="app-history.html">See all</a></div>
+          <div class="list" style="border:0;border-radius:0">
+            <a class="list-row" href="app-practice.html#result" style="padding-inline:0;color:inherit;text-decoration:none"><div class="grow"><span class="clamp-2">Tell me about yourself.</span><span class="meta">Today · 1:12 · 146 wpm</span></div><span class="badge">1.4 / min</span></a>
+            <a class="list-row" href="app-practice.html#result" style="padding-inline:0;color:inherit;text-decoration:none"><div class="grow"><span class="clamp-2">Tell me about a time you led a project.</span><span class="meta">Mon · 1:42 · 138 wpm</span></div><span class="badge">1.8 / min</span></a>
+            <a class="list-row" href="app-practice.html#result" style="padding-inline:0;color:inherit;text-decoration:none"><div class="grow"><span class="clamp-2">What's your biggest weakness?</span><span class="meta">Oct 21 · 0:58 · 152 wpm</span></div><span class="badge badge-warning">3.1 / min</span></a>
+            <a class="list-row" href="app-practice.html#result" style="padding-inline:0;color:inherit;text-decoration:none"><div class="grow"><span class="clamp-2">Tell me about yourself.</span><span class="meta">Oct 20 · 1:20 · 149 wpm</span></div><span class="badge">2.2 / min</span></a>
+          </div>
+        </section>
+      </div>
+
+      <!-- ===== First visit ===== -->
+      <div class="page-head" data-when="first">
+        <div class="stack" style="gap:4px"><h1>Welcome to umless</h1><p class="muted">Three steps to your first result. It takes about two minutes.</p></div>
+      </div>
+
+      <div class="dash-grid" data-when="first">
+        <section class="panel" aria-labelledby="start-title">
+          <div class="panel-head"><h2 id="start-title">Get started</h2><span class="badge">0 of 3 done</span></div>
+          <ol class="checklist">
+            <li><span class="tick">1</span><span><strong>Add a question</strong> <span class="muted">you expect to be asked</span></span></li>
+            <li><span class="tick">2</span><span><strong>Record your answer</strong> <span class="muted">out loud, like it's real</span></span></li>
+            <li><span class="tick">3</span><span><strong>See your result</strong> <span class="muted">fillers, pauses and pace</span></span></li>
+          </ol>
+          <div class="add-row">
+            <div class="field"><label class="label sr-only" for="first-q">New question</label><input class="input" id="first-q" placeholder="Type a question, like “Tell me about yourself”"></div>
+            <button class="btn btn-primary" type="button" disabled>Add</button>
+          </div>
+          <div class="stack" style="gap:var(--space-2)">
+            <span class="text-sm muted">Or start with one of these:</span>
+            <div class="row" style="gap:var(--space-2)">
+              <button class="chip" type="button"><svg class="icon" style="width:16px;height:16px"><use href="#i-plus"/></svg>Tell me about yourself.</button>
+              <button class="chip" type="button"><svg class="icon" style="width:16px;height:16px"><use href="#i-plus"/></svg>Why do you want this job?</button>
+              <button class="chip" type="button"><svg class="icon" style="width:16px;height:16px"><use href="#i-plus"/></svg>What's your biggest weakness?</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="what-title" style="align-content:start">
+          <div class="panel-head"><h2 id="what-title">What you'll see</h2></div>
+          <p class="transcript">So, <span class="filler">um</span>, I've been a developer for <span class="pause">··</span> five years.</p>
+          <p class="text-sm muted">Fillers are highlighted, and each dot is one second of silence. Your stats and progress chart appear here after your first take.</p>
+          <div class="grid grid-2" style="gap:var(--space-3)">
+            <div class="stat"><span class="stat-label">Fillers per minute</span><span class="stat-value muted">—</span></div>
+            <div class="stat"><span class="stat-label">Average pace</span><span class="stat-value muted">—</span></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<nav class="tabbar" aria-label="App">
+  <a href="app-dashboard.html" aria-current="page"><svg class="icon"><use href="#i-home"/></svg>Home</a>
+  <a href="app-questions.html"><svg class="icon"><use href="#i-list"/></svg>Questions</a>
+  <a href="app-history.html"><svg class="icon"><use href="#i-history"/></svg>History</a>
+  <a href="app-settings.html"><svg class="icon"><use href="#i-settings"/></svg>Settings</a>
+</nav>
+</body>
+</html>
