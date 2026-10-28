@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { ApiError, unwrap } from './client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ApiError, client, sendTokensFrom, unwrap } from './client'
 
 const result = (status: number, extra: { data?: unknown; error?: unknown } = {}) =>
   Promise.resolve({ ...extra, response: new Response(null, { status }) })
@@ -39,6 +39,51 @@ describe('unwrap', () => {
   it('throws an ApiError with status 0 when the fetch throws', async () => {
     const err = await rejection(unwrap(Promise.reject(new TypeError('Failed to fetch'))))
     expect(err).toBeInstanceOf(ApiError)
+    expect(err.status).toBe(0)
+  })
+})
+
+describe('sendTokensFrom', () => {
+  /** Calls the API with fetch stubbed; resolves to the Authorization header it was sent with. */
+  async function authorizationSent() {
+    const fetch = vi.fn(async () => Response.json({ status: 'ok' }))
+    vi.stubGlobal('fetch', fetch)
+    await client.GET('/api/health')
+    const request = (fetch.mock.calls[0] as unknown as [Request])[0]
+    return request.headers.get('Authorization')
+  }
+
+  afterEach(() => {
+    sendTokensFrom(null)
+    vi.unstubAllGlobals()
+  })
+
+  it('sends no Authorization header without a token source (local use)', async () => {
+    expect(await authorizationSent()).toBeNull()
+  })
+
+  it('sends the current session token as a Bearer token', async () => {
+    sendTokensFrom(async () => 'session-token')
+    expect(await authorizationSent()).toBe('Bearer session-token')
+  })
+
+  it('asks for the token on every request, so a refreshed token is used', async () => {
+    let n = 0
+    sendTokensFrom(async () => `token-${++n}`)
+    expect(await authorizationSent()).toBe('Bearer token-1')
+    expect(await authorizationSent()).toBe('Bearer token-2')
+  })
+
+  it('sends no header while signed out (the source returns null)', async () => {
+    sendTokensFrom(async () => null)
+    expect(await authorizationSent()).toBeNull()
+  })
+
+  it('reports a failing token source as an unreachable server, not a crash', async () => {
+    sendTokensFrom(async () => {
+      throw new Error('clerk_offline')
+    })
+    const err = await rejection(unwrap(client.GET('/api/health')))
     expect(err.status).toBe(0)
   })
 })

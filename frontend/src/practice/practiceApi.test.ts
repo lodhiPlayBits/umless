@@ -14,6 +14,14 @@ describe('transcribeFailure', () => {
     expect(transcribeFailure(err(500)).title).toBe("Can't reach the umless server")
   })
 
+  it('maps 402 payment_required to "out of practice time", with a way to buy more', () => {
+    expect(transcribeFailure(err(402, 'payment_required'))).toMatchObject({
+      title: "You're out of practice time",
+      canRetry: true,
+      needsTime: true,
+    })
+  })
+
   it('maps 502 transcription_failed to "Transcription failed", retryable', () => {
     expect(transcribeFailure(err(502, 'transcription_failed'))).toMatchObject({ title: 'Transcription failed', canRetry: true })
   })
@@ -65,6 +73,19 @@ describe('transcribeRecording', () => {
     expect(request.method).toBe('POST')
     expect(request.headers.get('Content-Type')).toBe('audio/webm;codecs=opus')
     expect(await request.text()).toBe('abc')
+  })
+
+  it('sends the question id, so the server saves the take, and none without one', async () => {
+    const transcript = { text: '', words: [], duration_seconds: 1, summary: {}, take_id: 't1' }
+    const fetchMock = vi.fn<(request: Request) => Promise<Response>>(async () => Response.json(transcript))
+    vi.stubGlobal('fetch', fetchMock)
+    const audio = new Blob(['a'], { type: 'audio/webm' })
+
+    await expect(transcribeRecording(audio, 'q 1')).resolves.toMatchObject({ take_id: 't1' })
+    await transcribeRecording(audio)
+
+    expect(new URL(fetchMock.mock.calls[0][0].url).searchParams.get('questionId')).toBe('q 1')
+    expect(new URL(fetchMock.mock.calls[1][0].url).search).toBe('')
   })
 
   it('rejects with an ApiError carrying the contract code', async () => {

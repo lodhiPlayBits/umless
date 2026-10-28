@@ -270,7 +270,7 @@ test('E14 the browser Back button with nothing downloaded asks "Leave without sa
   await page.goBack()
 
   await expect(dialog(page).getByRole('heading', { name: 'Leave without saving?' })).toBeVisible()
-  await expect(dialog(page).getByText(/aren't stored anywhere/)).toBeVisible()
+  await expect(dialog(page).getByText(/stored anywhere/)).toBeVisible()
   await dialog(page).getByRole('button', { name: 'Stay' }).click()
   await expect(page.getByText(FAKE_TRANSCRIPT)).toBeVisible()
   await expect(page).toHaveURL(/\/practice\//)

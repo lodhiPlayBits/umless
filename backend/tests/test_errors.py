@@ -74,6 +74,14 @@ def test_wrong_method_returns_method_not_allowed_with_allow_header():
     assert "GET" in response.headers["allow"]
 
 
+def test_transcriptions_path_allows_only_post():
+    response = make_client().get("/api/transcriptions")
+
+    assert response.status_code == 405
+    assert response.json()["code"] == "method_not_allowed"
+    assert response.headers["allow"] == "POST"
+
+
 def test_bare_http_exception_400_maps_to_unreadable_body_error():
     response = make_client().get("/boom-http")
 

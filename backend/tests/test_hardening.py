@@ -5,8 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.main import create_app, get_transcriber
+from app.main import create_app
 from app.transcription import DeepgramTranscriber, Transcript, TranscriptionError
+from app.transcription.router import get_transcriber
 
 AUDIO = b"fake-audio"
 

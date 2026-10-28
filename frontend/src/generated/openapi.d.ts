@@ -69,7 +69,8 @@ export interface paths {
         post?: never;
         /**
          * Delete a question
-         * @description The client treats 404 as already deleted.
+         * @description Also deletes the question's saved takes (Undo brings back the question, not its takes).
+         *     The client treats 404 as already deleted.
          */
         delete: operations["deleteQuestion"];
         options?: never;
@@ -99,8 +100,143 @@ export interface paths {
          *     Deepgram nova-3 with `filler_words=true`, `smart_format=true`, `language=en` and
          *     `mip_opt_out=true`, and is not stored. Silence returns 200 with empty `text` and
          *     `words` (shown as `result-empty`).
+         *
+         *     With `questionId`, the transcript is also saved as a take of that question (one of the
+         *     signed-in user's questions, checked before Deepgram is called; otherwise 404) and the
+         *     response's `take_id` names it. If saving fails the transcript is still returned, with
+         *     `take_id: null`.
+         *
+         *     On a metered server (getAccount `metered`), the user needs a free transcription or paid
+         *     time left, checked before Deepgram is called (otherwise 402). A transcript with words
+         *     then uses one free transcription, or deducts its length (rounded up to a second) from
+         *     paid time, never below zero. A transcript with no words is free.
          */
         post: operations["createTranscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/questions/{questionId}/takes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The question's UUID. Anything that is not an existing id (malformed included) returns 404. */
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        /** List a question's saved takes, newest first */
+        get: operations["listTakes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/takes/{takeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The take's UUID. Anything that is not one of the user's takes returns 404. */
+                takeId: components["parameters"]["TakeId"];
+            };
+            cookie?: never;
+        };
+        /** A saved take with its full transcript */
+        get: operations["getTake"];
+        put?: never;
+        post?: never;
+        /** Delete a saved take and its transcript */
+        delete: operations["deleteTake"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user's practice time and the packs on sale */
+        get: operations["getAccount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start buying a pack (creates a Razorpay order)
+         * @description The amount comes from the server's price list, never from the client. The response has
+         *     what Razorpay Checkout needs to open.
+         */
+        post: operations["createPaymentOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a Checkout payment and add its time
+         * @description Checks Razorpay's signature (HMAC-SHA256 of `order_id|payment_id` with the key secret),
+         *     then asks Razorpay that the payment belongs to the order, has its amount and is captured
+         *     (capturing an authorized one). Only then is the order's time credited, once; verifying a
+         *     paid order again changes nothing.
+         */
+        post: operations["verifyPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Razorpay's payment notification (server to server)
+         * @description Called by Razorpay, not the browser, so it needs no sign-in: the
+         *     `X-Razorpay-Signature` header (HMAC-SHA256 of the raw body with the webhook secret)
+         *     proves it. `payment.captured` and `order.paid` credit a known order whose amount
+         *     matches, once; anything else is acknowledged and ignored.
+         */
+        post: operations["razorpayWebhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -366,6 +502,128 @@ export interface components {
             /** @description Audio length reported by Deepgram; null if not reported. */
             duration_seconds: number | null;
             summary: components["schemas"]["TranscriptSummary"];
+            /**
+             * @description Only in createTranscription responses sent with `questionId`: the saved take's id,
+             *     or null if saving failed. Never part of a saved take's transcript.
+             */
+            take_id?: string | null;
+        };
+        /**
+         * @example {
+         *       "id": "7d1f0c3a-2b4e-4a6f-9c8d-1e2f3a4b5c6d",
+         *       "question_id": "3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10",
+         *       "created_at": "2026-10-25T10:15:02Z",
+         *       "duration_seconds": 4.5,
+         *       "summary": {
+         *         "word_count": 5,
+         *         "filler_count": 1,
+         *         "fillers": [
+         *           {
+         *             "word": "um",
+         *             "count": 1
+         *           }
+         *         ],
+         *         "words_per_minute": 67,
+         *         "fillers_per_minute": 13.3,
+         *         "pause_count": 1,
+         *         "longest_pause_seconds": 2.2
+         *       }
+         *     }
+         */
+        TakeSummary: {
+            /** Format: uuid */
+            id: string;
+            question_id: string;
+            /**
+             * Format: date-time
+             * @description When the take was saved, UTC.
+             */
+            created_at: string;
+            duration_seconds: number | null;
+            summary: components["schemas"]["TranscriptSummary"];
+        };
+        TakeList: {
+            /** @description Newest first. */
+            items: components["schemas"]["TakeSummary"][];
+        };
+        Take: {
+            /** Format: uuid */
+            id: string;
+            question_id: string;
+            /** Format: date-time */
+            created_at: string;
+            duration_seconds: number | null;
+            summary: components["schemas"]["TranscriptSummary"];
+            transcript: components["schemas"]["Transcript"];
+        };
+        Pack: {
+            /** @enum {string} */
+            id: "session_1" | "session_5";
+            label: string;
+            /** @description Practice time the pack adds. */
+            seconds: number;
+            /** @description Price in the currency's smallest unit (paise). */
+            amount_paise: number;
+            /** @enum {string} */
+            currency: "INR";
+        };
+        /**
+         * @example {
+         *       "metered": true,
+         *       "free_transcriptions_left": 0,
+         *       "seconds_left": 3540,
+         *       "packs": [
+         *         {
+         *           "id": "session_1",
+         *           "label": "1 session · 60 minutes",
+         *           "seconds": 3600,
+         *           "amount_paise": 4000,
+         *           "currency": "INR"
+         *         },
+         *         {
+         *           "id": "session_5",
+         *           "label": "5 sessions · 300 minutes",
+         *           "seconds": 18000,
+         *           "amount_paise": 12000,
+         *           "currency": "INR"
+         *         }
+         *       ]
+         *     }
+         */
+        Account: {
+            /** @description False on a server without payments (local use); then nothing is counted. */
+            metered: boolean;
+            free_transcriptions_left: number;
+            /** @description Paid practice time left. */
+            seconds_left: number;
+            /** @description What can be bought; empty when not metered. */
+            packs: components["schemas"]["Pack"][];
+        };
+        PaymentOrderCreate: {
+            /** @enum {string} */
+            pack_id: "session_1" | "session_5";
+        };
+        PaymentOrder: {
+            /** @description Razorpay's order id, for Checkout. */
+            order_id: string;
+            /** @description The public Razorpay key id, for Checkout. */
+            key_id: string;
+            amount_paise: number;
+            /** @enum {string} */
+            currency: "INR";
+            /** @enum {string} */
+            pack_id: "session_1" | "session_5";
+            label: string;
+        };
+        /** @description What Razorpay Checkout's success handler returns. */
+        PaymentVerify: {
+            order_id: string;
+            payment_id: string;
+            signature: string;
+        };
+        WebhookAck: {
+            /** @enum {string} */
+            status: "ok" | "ignored";
         };
         /**
          * @description Stable machine-readable code. `not_found` and `method_not_allowed` are for unknown
@@ -373,7 +631,7 @@ export interface components {
          * @example validation_error
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "invalid_host" | "internal_error";
+        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
         /**
          * @example {
          *       "field": "text",
@@ -400,6 +658,81 @@ export interface components {
         };
     };
     responses: {
+        /** @description This server has no Razorpay keys (or, for the webhook, no webhook secret). */
+        PaymentsUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "payments_unavailable",
+                 *       "detail": "Payments aren't set up on this server."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Razorpay couldn't be reached or refused the order. */
+        PaymentProviderFailed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "payment_provider_failed",
+                 *       "detail": "The payment couldn't be started. Try again in a moment."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description No take of the signed-in user has this id (deleted, unknown or someone else's). */
+        TakeNotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "take_not_found",
+                 *       "detail": "That take doesn't exist any more."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Object storage couldn't be reached; nothing was changed. */
+        StorageUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "storage_unavailable",
+                 *       "detail": "Your saved takes can't be reached right now. Try again in a moment."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description No session token, or one that is invalid, expired or issued to another site. */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "unauthorized",
+                 *       "detail": "Sign in to continue."
+                 *     }
+                 */
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description The Host header is not localhost or 127.0.0.1 (DNS-rebinding guard). */
         InvalidHost: {
             headers: {
@@ -485,6 +818,8 @@ export interface components {
     parameters: {
         /** @description The question's UUID. Anything that is not an existing id (malformed included) returns 404. */
         QuestionId: string;
+        /** @description The take's UUID. Anything that is not one of the user's takes returns 404. */
+        TakeId: string;
     };
     requestBodies: never;
     headers: never;
@@ -533,6 +868,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -561,6 +897,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["ValidationError"];
             500: components["responses"]["InternalError"];
@@ -586,6 +923,7 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["QuestionNotFound"];
             500: components["responses"]["InternalError"];
         };
@@ -616,6 +954,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["QuestionNotFound"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["ValidationError"];
@@ -624,7 +963,10 @@ export interface operations {
     };
     createTranscription: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Save the transcript as a take of this question. */
+                questionId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -666,6 +1008,23 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            /** @description No free transcriptions or paid time left. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "payment_required",
+                     *       "detail": "You're out of practice time. Buy a session to keep going."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["QuestionNotFound"];
             /** @description The body is larger than 25 MB. */
             413: {
                 headers: {
@@ -727,6 +1086,244 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    listTakes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The question's UUID. Anything that is not an existing id (malformed included) returns 404. */
+                questionId: components["parameters"]["QuestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The question's takes, newest first; each without its transcript. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakeList"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["QuestionNotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTake: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The take's UUID. Anything that is not one of the user's takes returns 404. */
+                takeId: components["parameters"]["TakeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The take and its transcript. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Take"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["TakeNotFound"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
+        };
+    };
+    deleteTake: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The take's UUID. Anything that is not one of the user's takes returns 404. */
+                takeId: components["parameters"]["TakeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["TakeNotFound"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
+        };
+    };
+    getAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The balance. On an unmetered server (local use) `metered` is false. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createPaymentOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentOrderCreate"];
+            };
+        };
+        responses: {
+            /** @description The order, ready for Checkout. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOrder"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["PaymentProviderFailed"];
+            503: components["responses"]["PaymentsUnavailable"];
+        };
+    };
+    verifyPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentVerify"];
+            };
+        };
+        responses: {
+            /** @description The new balance. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+            /** @description The signature doesn't match or the payment isn't captured (`payment_invalid`), or a bad Host header. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "payment_invalid",
+                     *       "detail": "This payment couldn't be verified."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description No order of the signed-in user has this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "order_not_found",
+                     *       "detail": "That payment order doesn't exist."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationError"];
+            500: components["responses"]["InternalError"];
+            502: components["responses"]["PaymentProviderFailed"];
+            503: components["responses"]["PaymentsUnavailable"];
+        };
+    };
+    razorpayWebhook: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Razorpay-Signature"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Acknowledged. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+            /** @description The signature is missing or wrong (`payment_invalid`), or a bad Host header. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "payment_invalid",
+                     *       "detail": "This payment couldn't be verified."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["PaymentsUnavailable"];
         };
     };
 }

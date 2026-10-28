@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
+import LoadErrorBanner from '../components/LoadErrorBanner'
 import NotFound from '../NotFound'
 import { isServerUp, loadPracticeQuestion } from './practiceApi'
 import type { PracticeQuestion } from './practiceApi'
 import PracticeSession from './PracticeSession'
 
-type Load = { status: 'loading' } | { status: 'missing' } | { status: 'error' } | { status: 'ready'; practice: PracticeQuestion }
+/** The same limit as the questions list (docs/design/flows.md F1). */
+const LOAD_TIMEOUT_MS = 10_000
+
+type Load =
+  | { status: 'loading' }
+  | { status: 'missing' }
+  | { status: 'error'; error: unknown }
+  | { status: 'ready'; practice: PracticeQuestion }
 
 /** /practice/:questionId — finds the question in the list (E16: unknown or deleted → not-found). */
 export default function PracticeRoute({ questionId }: { questionId: string }) {
@@ -13,37 +21,30 @@ export default function PracticeRoute({ questionId }: { questionId: string }) {
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    let cancelled = false
+    // Leaving the page or pressing Retry aborts this attempt's requests, and so does the timeout,
+    // so a hung backend ends in the error banner and "Server offline" instead of "Loading…" forever.
+    const controller = new AbortController()
+    // Not cleared when the requests finish: aborting a settled request is a no-op, and the limit then
+    // covers whichever of the two is still pending.
+    const timeout = window.setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS)
+    let current = true
     setLoad({ status: 'loading' })
-    loadPracticeQuestion(questionId).then(
-      (practice) => !cancelled && setLoad(practice ? { status: 'ready', practice } : { status: 'missing' }),
-      () => !cancelled && setLoad({ status: 'error' }),
+    loadPracticeQuestion(questionId, controller.signal).then(
+      (practice) => current && setLoad(practice ? { status: 'ready', practice } : { status: 'missing' }),
+      (error: unknown) => current && setLoad({ status: 'error', error }),
     )
-    void isServerUp().then((up) => !cancelled && setServerUp(up))
+    void isServerUp(controller.signal).then((up) => current && setServerUp(up))
     return () => {
-      cancelled = true
+      current = false
+      window.clearTimeout(timeout)
+      controller.abort()
     }
   }, [questionId, attempt])
 
   if (load.status === 'loading') return <p className="muted" role="status">Loading…</p>
   if (load.status === 'missing') return <NotFound />
   if (load.status === 'error') {
-    return (
-      <div className="banner error" role="alert">
-        <span aria-hidden="true">⚠</span>
-        <div>
-          <strong>Can't reach the umless server</strong>
-          <span className="small">
-            Start the backend with <code>python run.py</code> in the <code>backend</code> folder, then retry.
-          </span>
-          <div className="actions">
-            <button type="button" className="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+    return <LoadErrorBanner error={load.error} title="Couldn't load this question" onRetry={() => setAttempt((n) => n + 1)} />
   }
   return <PracticeSession practice={load.practice} serverUp={serverUp} />
 }

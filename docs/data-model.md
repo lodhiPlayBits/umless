@@ -76,7 +76,7 @@ erDiagram
 - Access goes through a `QuestionRepository` Protocol (`list`, `get`, `add(text, position=None)`, `update(id, text)`, `delete(id)`). v1 implementation: `JsonFileQuestionRepository`, loaded once at startup, every mutation under a `threading.Lock`, written through a temp file plus `os.replace` with up to 5 retries on Windows `PermissionError`.
 - **Indexes:** none on disk. In memory the repository keeps the ordered list plus a dict from `id` to question for O(1) `get`, `update` and `delete`.
 - A file that exists but can't be parsed, or has an unknown `version`, stops startup with a clear error naming the file. The app never overwrites it, so a hand-edited or corrupted list isn't lost.
-- Later (out of v1): `SqlQuestionRepository` on SQLite via SQLAlchemy + Alembic, with an integer `position` column and an index on it, passing the same repository contract tests.
+- **MySQL (deployed site):** when `DB_HOST` is set, questions live in MySQL instead (`app/questions/sql.py`, schema from the Alembic migrations in `backend/migrations/`). Table `questions`: `id` CHAR(36) primary key, `user_id` VARCHAR(255), `position` INT (0-based, kept dense per user), `text` VARCHAR(500), `created_at` DATETIME (UTC); index on (`user_id`, `position`); `utf8mb4_bin` collation so ids compare exactly. Each user has their own list, keyed by their Clerk user id (`docs/adr/0003-clerk-auth.md`); another user's id behaves like a missing one (404). Without sign-in (local use) every request is user `local`. It passes the same repository contract tests as the JSON file.
 
 ### Who reads and writes it
 
@@ -133,3 +133,12 @@ The recording a user made in one attempt: an audio `Blob`, its MIME type (`audio
 |---|---|---|
 | `word` | string enum | `um`, `uh`, `mhmm`. Deepgram's other filler tokens (`uh-huh`, `uh-uh`, `mm-mm`, `nuh-uh`) are yes/no answers and count as ordinary words |
 | `count` | integer | ≥ 1 |
+
+## Take (persisted per user)
+
+A take is one transcribed answer to a question, saved when the browser transcribes with `questionId` (`app/takes/`). The audio is never stored; only the transcript.
+
+- **Record** (MySQL table `takes`, migration `0002`): `id` CHAR(36), `user_id` VARCHAR(255), `question_id` VARCHAR(64), `created_at` DATETIME (UTC), `duration_seconds` FLOAT NULL, `summary` JSON (the TranscriptSummary, so lists need no download); index on (`user_id`, `question_id`, `created_at`); `utf8mb4_bin`.
+- **Transcript** (OCI Object Storage, bucket `OCI_BUCKET`): `users/<url-encoded user id>/takes/<take id>.json` holding `{version: 1, take_id, question_id, question_text (snapshot), created_at, transcript}`; `transcript` is the createTranscription body without `take_id`.
+- Saving writes the object first, then the record (a failed record removes the object). Deleting removes the object first, then the record, so a failed delete can be retried. Deleting a question deletes its takes; Undo brings back the question only.
+- Every query filters on `user_id`; another user's take id behaves like a missing one (404). Without a database or bucket (local use) both live in memory until the server stops.

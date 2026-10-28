@@ -1,0 +1,9 @@
+.venv/
+.venv-wsl/
+__pycache__/
+.pytest_cache/
+.schemathesis/
+data/
+tests/
+.env
+.env.*

@@ -4,7 +4,8 @@ import { practicePath } from '../router'
 import { formatClock } from '../timeLabel'
 import { useObjectUrl } from '../useObjectUrl'
 import type { Transcript } from './practiceApi'
-import { summaryRows, transcriptFile, transcriptSegments } from './summaryText'
+import { summaryRows, transcriptFile } from './summaryText'
+import TranscriptCard from './TranscriptCard'
 
 interface ResultViewProps {
   question: string
@@ -80,34 +81,7 @@ export default function ResultView(props: ResultViewProps) {
             </button>
           </div>
         </aside>
-        <article className="card transcript" aria-labelledby="transcript-heading">
-          <h2 id="transcript-heading">Transcript</h2>
-          <div className="legend">
-            <span>
-              <mark className="filler">um</mark> filler word
-            </span>
-            <span>
-              <span className="pause">..</span> pause, one dot per second
-            </span>
-          </div>
-          {/* E13: long transcripts scroll inside the card; tabIndex lets keyboard users scroll it. */}
-          <div className="body" role="region" tabIndex={0} aria-label="Transcript text">
-            {transcriptSegments(transcript.words).map((segment, index) => (
-              <Fragment key={index}>
-                {index > 0 && ' '}
-                {segment.kind === 'pause' ? (
-                  <span className="pause" role="img" aria-label={`${segment.dots} second pause`}>
-                    {'.'.repeat(segment.dots)}
-                  </span>
-                ) : segment.filler ? (
-                  <mark className="filler">{segment.text}</mark>
-                ) : (
-                  segment.text
-                )}
-              </Fragment>
-            ))}
-          </div>
-        </article>
+        <TranscriptCard transcript={transcript} />
       </div>
       <div className="bottom-bar">
         <button type="button" className="btn btn-primary" onClick={props.onPractiseAgain}>

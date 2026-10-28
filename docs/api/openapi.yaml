@@ -2,11 +2,14 @@ openapi: 3.1.0
 info:
   title: umless API
   version: 1.0.0
-  summary: Local speech practice backend - questions and transcription.
+  summary: Speech practice backend - questions and transcription.
   description: |
-    Contract for umless v1 (see docs/prd.md and docs/adr/0001-architecture.md).
-    Local and single-user: the server binds to 127.0.0.1, accepts only localhost Host
-    headers, and has no authentication. Every non-2xx response uses the `Error` schema.
+    Contract for umless (see docs/prd.md, docs/adr/0001-architecture.md and
+    docs/adr/0003-clerk-auth.md). Every operation except getHealth needs a Clerk session
+    token (`clerkSession`); each signed-in user sees only their own questions. A backend
+    started without Clerk configured (local, single-user use) accepts calls without a token,
+    and everyone is one local user. The server accepts only localhost Host headers (the
+    public gateway sends one). Every non-2xx response uses the `Error` schema.
     `x-screen` on each operation names the screen actions from docs/design/screens.md it serves.
   license:
     name: Proprietary
@@ -14,14 +17,19 @@ info:
 servers:
   - url: http://127.0.0.1:8000
     description: Local backend (the Vite dev server proxies /api here)
-security: []
+security:
+  - clerkSession: []
 tags:
   - name: health
     description: Server availability
   - name: questions
-    description: The user's practice questions (persisted in a JSON file)
+    description: The signed-in user's practice questions (MySQL, or a JSON file locally)
   - name: transcriptions
-    description: Speech-to-text through Deepgram; nothing is stored
+    description: Speech-to-text through Deepgram; the audio is never stored
+  - name: billing
+    description: Practice time (free transcriptions, then paid minutes) and Razorpay payments
+  - name: takes
+    description: The signed-in user's saved transcripts, per question (records in MySQL, transcripts in object storage)
 
 paths:
   /api/health:
@@ -65,8 +73,9 @@ paths:
         question at an earlier position. The practice route also loads from this list: it finds
         the question by id (missing → `not-found`), and uses its index for "2 of 5" and for
         Next question, so one read serves the whole screen and can't disagree with itself.
-      security: []
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: All questions.
           content:
@@ -91,7 +100,6 @@ paths:
         - questions-empty / add suggested question
         - questions-invalid / fix and create question, add anyway, retry save
         - questions-deleted / undo delete (with position)
-      security: []
       requestBody:
         required: true
         content:
@@ -109,6 +117,8 @@ paths:
                   text: Why do you want this job?
                   position: 1
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '201':
           description: Created.
           headers:
@@ -144,7 +154,6 @@ paths:
       x-screen:
         - questions / update question (Save in inline edit)
         - questions-invalid / retry save (edit mode)
-      security: []
       requestBody:
         required: true
         content:
@@ -152,6 +161,8 @@ paths:
             schema:
               $ref: '#/components/schemas/QuestionUpdate'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: The updated question.
           content:
@@ -172,11 +183,14 @@ paths:
       operationId: deleteQuestion
       tags: [questions]
       summary: Delete a question
-      description: The client treats 404 as already deleted.
+      description: |
+        Also deletes the question's saved takes (Undo brings back the question, not its takes).
+        The client treats 404 as already deleted.
       x-screen:
         - delete-confirm / delete question
-      security: []
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '204':
           description: Deleted.
         '404':
@@ -198,10 +212,29 @@ paths:
         Deepgram nova-3 with `filler_words=true`, `smart_format=true`, `language=en` and
         `mip_opt_out=true`, and is not stored. Silence returns 200 with empty `text` and
         `words` (shown as `result-empty`).
+
+        With `questionId`, the transcript is also saved as a take of that question (one of the
+        signed-in user's questions, checked before Deepgram is called; otherwise 404) and the
+        response's `take_id` names it. If saving fails the transcript is still returned, with
+        `take_id: null`.
+
+        On a metered server (getAccount `metered`), the user needs a free transcription or paid
+        time left, checked before Deepgram is called (otherwise 402). A transcript with words
+        then uses one free transcription, or deducts its length (rounded up to a second) from
+        paid time, never below zero. A transcript with no words is free.
       x-screen:
         - practice-review / transcribe recording
         - practice-transcribe-error / retry transcription
-      security: []
+      parameters:
+        - name: questionId
+          in: query
+          required: false
+          description: Save the transcript as a take of this question.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+            example: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
       requestBody:
         required: true
         content:
@@ -221,6 +254,8 @@ paths:
             schema:
               $ref: '#/components/schemas/AudioBody'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '200':
           description: The transcript with filler flags, pauses and a summary.
           content:
@@ -247,6 +282,17 @@ paths:
               example:
                 code: audio_too_large
                 detail: The recording is larger than 25 MB.
+        '404':
+          $ref: '#/components/responses/QuestionNotFound'
+        '402':
+          description: No free transcriptions or paid time left.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: payment_required
+                detail: You're out of practice time. Buy a session to keep going.
         '415':
           description: The Content-Type is missing or not one of the accepted audio types.
           content:
@@ -277,6 +323,237 @@ paths:
                 code: transcription_unavailable
                 detail: Transcription is unavailable because DEEPGRAM_API_KEY is not set.
 
+  /api/questions/{questionId}/takes:
+    parameters:
+      - $ref: '#/components/parameters/QuestionId'
+    get:
+      operationId: listTakes
+      tags: [takes]
+      summary: List a question's saved takes, newest first
+      x-screen:
+        - practice-ready / past takes (on load)
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The question's takes, newest first; each without its transcript.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TakeList'
+        '404':
+          $ref: '#/components/responses/QuestionNotFound'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/takes/{takeId}:
+    parameters:
+      - $ref: '#/components/parameters/TakeId'
+    get:
+      operationId: getTake
+      tags: [takes]
+      summary: A saved take with its full transcript
+      x-screen:
+        - practice-ready / view past take
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The take and its transcript.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Take'
+        '404':
+          $ref: '#/components/responses/TakeNotFound'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/StorageUnavailable'
+    delete:
+      operationId: deleteTake
+      tags: [takes]
+      summary: Delete a saved take and its transcript
+      x-screen:
+        - practice-ready / delete past take
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '204':
+          description: Deleted.
+        '404':
+          $ref: '#/components/responses/TakeNotFound'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/StorageUnavailable'
+
+  /api/account:
+    get:
+      operationId: getAccount
+      tags: [billing]
+      summary: The signed-in user's practice time and the packs on sale
+      x-screen:
+        - header / practice time left
+        - buy-time / pack choices
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The balance. On an unmetered server (local use) `metered` is false.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/payments/orders:
+    post:
+      operationId: createPaymentOrder
+      tags: [billing]
+      summary: Start buying a pack (creates a Razorpay order)
+      description: |
+        The amount comes from the server's price list, never from the client. The response has
+        what Razorpay Checkout needs to open.
+      x-screen:
+        - buy-time / buy pack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentOrderCreate'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '201':
+          description: The order, ready for Checkout.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOrder'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/PaymentProviderFailed'
+        '503':
+          $ref: '#/components/responses/PaymentsUnavailable'
+
+  /api/payments/verify:
+    post:
+      operationId: verifyPayment
+      tags: [billing]
+      summary: Confirm a Checkout payment and add its time
+      description: |
+        Checks Razorpay's signature (HMAC-SHA256 of `order_id|payment_id` with the key secret),
+        then asks Razorpay that the payment belongs to the order, has its amount and is captured
+        (capturing an authorized one). Only then is the order's time credited, once; verifying a
+        paid order again changes nothing.
+      x-screen:
+        - buy-time / payment succeeded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentVerify'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The new balance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          description: The signature doesn't match or the payment isn't captured (`payment_invalid`), or a bad Host header.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: payment_invalid
+                detail: This payment couldn't be verified.
+        '404':
+          description: No order of the signed-in user has this id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: order_not_found
+                detail: That payment order doesn't exist.
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/PaymentProviderFailed'
+        '503':
+          $ref: '#/components/responses/PaymentsUnavailable'
+
+  /api/payments/webhook:
+    post:
+      operationId: razorpayWebhook
+      tags: [billing]
+      summary: Razorpay's payment notification (server to server)
+      description: |
+        Called by Razorpay, not the browser, so it needs no sign-in: the
+        `X-Razorpay-Signature` header (HMAC-SHA256 of the raw body with the webhook secret)
+        proves it. `payment.captured` and `order.paid` credit a known order whose amount
+        matches, once; anything else is acknowledged and ignored.
+      security: []
+      parameters:
+        - name: X-Razorpay-Signature
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Acknowledged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '400':
+          description: The signature is missing or wrong (`payment_invalid`), or a bad Host header.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: payment_invalid
+                detail: This payment couldn't be verified.
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/PaymentsUnavailable'
+
 components:
   parameters:
     QuestionId:
@@ -290,7 +567,73 @@ components:
         maxLength: 64
         example: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
 
+    TakeId:
+      name: takeId
+      in: path
+      required: true
+      description: The take's UUID. Anything that is not one of the user's takes returns 404.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        example: 7d1f0c3a-2b4e-4a6f-9c8d-1e2f3a4b5c6d
+
+  securitySchemes:
+    clerkSession:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        The Clerk session token from the frontend's `getToken()`, sent as
+        `Authorization: Bearer <token>`. Verified with Clerk's published keys (RS256); its
+        `sub` is the user id that owns the questions.
+
   responses:
+    PaymentsUnavailable:
+      description: This server has no Razorpay keys (or, for the webhook, no webhook secret).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: payments_unavailable
+            detail: Payments aren't set up on this server.
+    PaymentProviderFailed:
+      description: Razorpay couldn't be reached or refused the order.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: payment_provider_failed
+            detail: The payment couldn't be started. Try again in a moment.
+    TakeNotFound:
+      description: No take of the signed-in user has this id (deleted, unknown or someone else's).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: take_not_found
+            detail: That take doesn't exist any more.
+    StorageUnavailable:
+      description: Object storage couldn't be reached; nothing was changed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: storage_unavailable
+            detail: Your saved takes can't be reached right now. Try again in a moment.
+    Unauthorized:
+      description: No session token, or one that is invalid, expired or issued to another site.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: unauthorized
+            detail: Sign in to continue.
     InvalidHost:
       description: The Host header is not localhost or 127.0.0.1 (DNS-rebinding guard).
       content:
@@ -587,6 +930,12 @@ components:
           description: Audio length reported by Deepgram; null if not reported.
         summary:
           $ref: '#/components/schemas/TranscriptSummary'
+        take_id:
+          type: [string, 'null']
+          minLength: 1
+          description: |
+            Only in createTranscription responses sent with `questionId`: the saved take's id,
+            or null if saving failed. Never part of a saved take's transcript.
       example:
         text: So, .. um, I led the migration.
         words:
@@ -644,12 +993,209 @@ components:
           pause_count: 1
           longest_pause_seconds: 2.2
 
+    TakeSummary:
+      type: object
+      additionalProperties: false
+      required: [id, question_id, created_at, duration_seconds, summary]
+      properties:
+        id:
+          type: string
+          format: uuid
+        question_id:
+          type: string
+          minLength: 1
+        created_at:
+          type: string
+          format: date-time
+          description: When the take was saved, UTC.
+        duration_seconds:
+          type: [number, 'null']
+          minimum: 0
+        summary:
+          $ref: '#/components/schemas/TranscriptSummary'
+      example:
+        id: 7d1f0c3a-2b4e-4a6f-9c8d-1e2f3a4b5c6d
+        question_id: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
+        created_at: '2026-10-25T10:15:02Z'
+        duration_seconds: 4.5
+        summary:
+          word_count: 5
+          filler_count: 1
+          fillers:
+            - word: um
+              count: 1
+          words_per_minute: 67
+          fillers_per_minute: 13.3
+          pause_count: 1
+          longest_pause_seconds: 2.2
+
+    TakeList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: Newest first.
+          items:
+            $ref: '#/components/schemas/TakeSummary'
+
+    Take:
+      type: object
+      additionalProperties: false
+      required: [id, question_id, created_at, duration_seconds, summary, transcript]
+      properties:
+        id:
+          type: string
+          format: uuid
+        question_id:
+          type: string
+          minLength: 1
+        created_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: [number, 'null']
+          minimum: 0
+        summary:
+          $ref: '#/components/schemas/TranscriptSummary'
+        transcript:
+          $ref: '#/components/schemas/Transcript'
+
+    Pack:
+      type: object
+      additionalProperties: false
+      required: [id, label, seconds, amount_paise, currency]
+      properties:
+        id:
+          type: string
+          enum: [session_1, session_5]
+        label:
+          type: string
+          minLength: 1
+        seconds:
+          type: integer
+          minimum: 1
+          description: Practice time the pack adds.
+        amount_paise:
+          type: integer
+          minimum: 100
+          description: Price in the currency's smallest unit (paise).
+        currency:
+          type: string
+          enum: [INR]
+
+    Account:
+      type: object
+      additionalProperties: false
+      required: [metered, free_transcriptions_left, seconds_left, packs]
+      properties:
+        metered:
+          type: boolean
+          description: False on a server without payments (local use); then nothing is counted.
+        free_transcriptions_left:
+          type: integer
+          minimum: 0
+        seconds_left:
+          type: integer
+          minimum: 0
+          description: Paid practice time left.
+        packs:
+          type: array
+          description: What can be bought; empty when not metered.
+          items:
+            $ref: '#/components/schemas/Pack'
+      example:
+        metered: true
+        free_transcriptions_left: 0
+        seconds_left: 3540
+        packs:
+          - id: session_1
+            label: 1 session · 60 minutes
+            seconds: 3600
+            amount_paise: 4000
+            currency: INR
+          - id: session_5
+            label: 5 sessions · 300 minutes
+            seconds: 18000
+            amount_paise: 12000
+            currency: INR
+
+    PaymentOrderCreate:
+      type: object
+      additionalProperties: false
+      required: [pack_id]
+      properties:
+        pack_id:
+          type: string
+          enum: [session_1, session_5]
+
+    PaymentOrder:
+      type: object
+      additionalProperties: false
+      required: [order_id, key_id, amount_paise, currency, pack_id, label]
+      properties:
+        order_id:
+          type: string
+          minLength: 1
+          description: Razorpay's order id, for Checkout.
+        key_id:
+          type: string
+          minLength: 1
+          description: The public Razorpay key id, for Checkout.
+        amount_paise:
+          type: integer
+          minimum: 100
+        currency:
+          type: string
+          enum: [INR]
+        pack_id:
+          type: string
+          enum: [session_1, session_5]
+        label:
+          type: string
+          minLength: 1
+
+    PaymentVerify:
+      type: object
+      additionalProperties: false
+      required: [order_id, payment_id, signature]
+      description: What Razorpay Checkout's success handler returns.
+      properties:
+        order_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+        payment_id:
+          type: string
+          minLength: 1
+          maxLength: 64
+        signature:
+          type: string
+          minLength: 1
+          maxLength: 256
+
+    WebhookAck:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, ignored]
+
     ErrorCode:
       type: string
       enum:
         - validation_error
         - unsupported_media_type
         - question_not_found
+        - take_not_found
+        - order_not_found
+        - payment_required
+        - payment_invalid
+        - payment_provider_failed
+        - payments_unavailable
         - not_found
         - method_not_allowed
         - empty_audio
@@ -657,7 +1203,9 @@ components:
         - unsupported_audio_type
         - transcription_failed
         - transcription_unavailable
+        - storage_unavailable
         - invalid_host
+        - unauthorized
         - internal_error
       description: |
         Stable machine-readable code. `not_found` and `method_not_allowed` are for unknown

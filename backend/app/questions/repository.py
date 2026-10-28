@@ -7,32 +7,16 @@ import os
 import threading
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Protocol
 
+from app.questions.domain import MAX_TEXT_LENGTH, Question, trim
+
 FILE_VERSION = 1
-MAX_TEXT_LENGTH = 500
 REPLACE_ATTEMPTS = 6  # the first try plus 5 retries on Windows PermissionError
-# What JavaScript's String.prototype.trim() removes, so the server and the browser agree on
-# "empty" and on the contract's `\S` pattern (Python's str.strip() uses a different set).
-WHITESPACE = (
-    "\t\n\v\f\r            "
-    "      　﻿"
-)
 ITEM_KEYS = {"id", "text", "created_at"}
-
-
-def trim(text: str) -> str:
-    return text.strip(WHITESPACE)
-
-
-@dataclass(frozen=True)
-class Question:
-    id: str
-    text: str
-    created_at: str
 
 
 class QuestionFileError(Exception):
@@ -49,6 +33,12 @@ class QuestionRepository(Protocol):
     def update(self, id: str, text: str) -> Question | None: ...
 
     def delete(self, id: str) -> bool: ...
+
+
+class QuestionStore(Protocol):
+    """Where every user's questions live; app.state.questions holds one."""
+
+    def for_user(self, user_id: str) -> QuestionRepository: ...
 
 
 class JsonFileQuestionRepository:
@@ -70,6 +60,10 @@ class JsonFileQuestionRepository:
         self._retry_delay = retry_delay
         self._lock = threading.Lock()
         self._questions = self._load()
+
+    def for_user(self, user_id: str) -> JsonFileQuestionRepository:
+        # One local list, whoever asks: the file store is for a single user on their machine.
+        return self
 
     def list(self) -> list[Question]:
         with self._lock:

@@ -1,11 +1,17 @@
+import { PageCrash } from './AppCrash'
+import ErrorBoundary from './components/ErrorBoundary'
+import Footer from './legal/Footer'
+import LegalPage from './legal/LegalPage'
 import Link from './Link'
 import NotFound from './NotFound'
 import PracticeRoute from './practice/PracticeRoute'
 import QuestionsScreen from './questions/QuestionsScreen'
 import { parseRoute, usePathname } from './router'
+import { AccountMenu } from './SignInGate'
 
 function App() {
-  const route = parseRoute(usePathname())
+  const pathname = usePathname()
+  const route = parseRoute(pathname)
 
   return (
     <>
@@ -13,17 +19,25 @@ function App() {
         <Link to="/" className="logo" aria-label="umless, back to questions">
           um<span>less</span>
         </Link>
-        {route.name === 'practice' && (
-          <nav aria-label="Practice">
-            <Link to="/">← Questions</Link>
-          </nav>
-        )}
+        <div className="header-end">
+          {(route.name === 'practice' || route.name === 'legal') && (
+            <nav aria-label="Practice">
+              <Link to="/">← Questions</Link>
+            </nav>
+          )}
+          <AccountMenu />
+        </div>
       </header>
       <main>
-        {route.name === 'questions' && <QuestionsScreen />}
-        {route.name === 'practice' && <PracticeRoute key={route.questionId} questionId={route.questionId} />}
-        {route.name === 'notFound' && <NotFound />}
+        {/* Keyed by path: navigating away from a crashed page clears the fallback. */}
+        <ErrorBoundary key={pathname} fallback={<PageCrash showBack={route.name !== 'questions'} />}>
+          {route.name === 'questions' && <QuestionsScreen />}
+          {route.name === 'practice' && <PracticeRoute key={route.questionId} questionId={route.questionId} />}
+          {route.name === 'legal' && <LegalPage page={route.page} />}
+          {route.name === 'notFound' && <NotFound />}
+        </ErrorBoundary>
       </main>
+      <Footer />
     </>
   )
 }

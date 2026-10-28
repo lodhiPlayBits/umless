@@ -1,3 +1,4 @@
+import { UNREACHABLE_TITLE, classifyApiError } from '../apiErrors'
 import { ApiError, client, unwrap } from '../client'
 import type { components } from '../generated/openapi'
 import type { Question } from '../questions/questionText'
@@ -17,26 +18,28 @@ export interface PracticeQuestion {
  * question, its position and the next question come from one consistent read.
  * Resolves to null when no question has this id.
  */
-export async function loadPracticeQuestion(questionId: string): Promise<PracticeQuestion | null> {
-  const { items } = await unwrap(client.GET('/api/questions'))
+export async function loadPracticeQuestion(questionId: string, signal?: AbortSignal): Promise<PracticeQuestion | null> {
+  const { items } = await unwrap(client.GET('/api/questions', { signal }))
   const index = items.findIndex((q) => q.id === questionId)
   if (index === -1) return null
   return { question: items[index], number: index + 1, total: items.length, nextId: items[index + 1]?.id ?? null }
 }
 
 /** False when the backend can't be reached; recording still works, transcribing won't. */
-export async function isServerUp(): Promise<boolean> {
+export async function isServerUp(signal?: AbortSignal): Promise<boolean> {
   try {
-    await unwrap(client.GET('/api/health'))
+    await unwrap(client.GET('/api/health', { signal }))
     return true
   } catch {
     return false
   }
 }
 
-export function transcribeRecording(audio: Blob): Promise<Transcript> {
+/** With a questionId, the server also saves the transcript as a take of that question (`take_id`). */
+export function transcribeRecording(audio: Blob, questionId?: string): Promise<Transcript> {
   return unwrap(
     client.POST('/api/transcriptions', {
+      params: { query: questionId === undefined ? {} : { questionId } },
       // The contract types the raw audio body as a binary string; send the Blob unchanged.
       body: audio as unknown as string,
       bodySerializer: (body) => body as unknown as Blob,
@@ -50,16 +53,17 @@ export interface TranscribeFailure {
   detail: string
   /** False when trying the same recording again can't help (too large, or not set up). */
   canRetry: boolean
+  /** Out of practice time: offer to buy more, then Try again. */
+  needsTime?: boolean
 }
 
 /** One message per cause (docs/design/flows.md E8–E11, wireframe practice-transcribe-error). */
 export function transcribeFailure(error: unknown): TranscribeFailure {
   const status = error instanceof ApiError ? error.status : 0
   const code = error instanceof ApiError ? error.code : undefined
-  // No error code on a 5xx means the dev proxy answered: the backend isn't running.
-  if (status === 0 || (code === undefined && status >= 500)) {
+  if (classifyApiError(error) === 'unreachable') {
     return {
-      title: "Can't reach the umless server",
+      title: UNREACHABLE_TITLE,
       detail: 'Your recording is safe in this tab. Start the backend, then try again.',
       canRetry: true,
     }
@@ -72,6 +76,14 @@ export function transcribeFailure(error: unknown): TranscribeFailure {
       title: "Transcription isn't set up",
       detail: 'Add DEEPGRAM_API_KEY to the backend .env, restart it, then try again.',
       canRetry: true,
+    }
+  }
+  if (code === 'payment_required') {
+    return {
+      title: "You're out of practice time",
+      detail: 'Buy more time, then press Try again. Your recording is safe in this tab.',
+      canRetry: true,
+      needsTime: true,
     }
   }
   if (code === 'audio_too_large') {

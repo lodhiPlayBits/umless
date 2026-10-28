@@ -3,7 +3,7 @@ from typing import Annotated, Any
 from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field
 from pydantic_core import PydanticCustomError
 
-from app.questions.repository import MAX_TEXT_LENGTH, trim
+from app.questions.domain import MAX_TEXT_LENGTH, trim
 
 
 def _check_text(text: str) -> str:

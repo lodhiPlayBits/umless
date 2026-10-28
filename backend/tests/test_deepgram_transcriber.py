@@ -267,7 +267,7 @@ def test_settings_from_env_reads_environment(monkeypatch):
     monkeypatch.setenv("DEEPGRAM_API_KEY", "abc")
     monkeypatch.setenv("UMLESS_TRANSCRIBER", "fake")
 
-    s = Settings.from_env()
+    s = Settings.from_env(env_files=())
 
     assert s.deepgram_api_key == "abc"
     assert s.transcriber == "fake"
@@ -277,7 +277,7 @@ def test_settings_from_env_defaults_to_deepgram(monkeypatch):
     monkeypatch.delenv("UMLESS_TRANSCRIBER", raising=False)
     monkeypatch.delenv("DEEPGRAM_API_KEY", raising=False)
 
-    s = Settings.from_env()
+    s = Settings.from_env(env_files=())
 
     assert s.transcriber == "deepgram"
 

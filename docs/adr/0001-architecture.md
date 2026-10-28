@@ -22,11 +22,18 @@ backend/
     main.py            create_app(): middleware, error handlers, routers
     config.py          Settings from env (.env files), Deepgram constants
     errors.py          ApiError, error codes, exception handlers  (new)
+    http.py            request helpers shared by routers (settings, media type)
     questions/         (new)
+      domain.py        Question and the text rules (length, trim) every layer shares
       models.py        Pydantic request/response models
       repository.py    QuestionRepository Protocol + JsonFileQuestionRepository
       router.py        /api/questions routes
-    transcription.py   Transcriber Protocol, Deepgram + Fake, pause dots
+    transcription/
+      models.py        Word, Transcript, TranscriptionError, Transcriber Protocol
+      text.py          pause dots and the transcript text
+      deepgram.py      DeepgramTranscriber and its response parsing
+      fake.py          FakeTranscriber
+      router.py        /api/transcriptions route, get_transcriber
     summary.py         filler detection and TranscriptSummary  (new)
   data/questions.json  runtime data, git-ignored
   tests/
@@ -39,7 +46,7 @@ docs/
 Existing modules stay where they are; only the new ones are added.
 
 ### Auth
-None in v1. Safety comes from the deployment shape instead:
+(Superseded by ADR 0003: Clerk sign-in for the deployed site.) None in v1. Safety comes from the deployment shape instead:
 - uvicorn binds to `127.0.0.1` only (already in `run.py`).
 - Starlette's `TrustedHostMiddleware` (part of FastAPI, no new dependency) allows only `localhost` and `127.0.0.1`, which blocks DNS-rebinding attacks from web pages. A rejected host gets the shared error body (400 `invalid_host`), not Starlette's plain-text default, so the check is a small custom middleware or a wrapper around it.
 - No CORS middleware: the browser reaches the API through the Vite proxy, so it's same-origin, and other origins can't read responses or send non-simple requests.

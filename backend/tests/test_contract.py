@@ -7,12 +7,14 @@ against the contract.
 
 import pytest
 import schemathesis
+from schemathesis.specs.openapi.checks import positive_data_acceptance
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.main import create_app, get_transcriber
+from app.main import create_app
 from app.questions.router import get_question_repository
 from app.transcription import TranscriptionError
+from app.transcription.router import get_transcriber
 
 schema = schemathesis.pytest.from_fixture("contract_schema")
 
@@ -24,9 +26,15 @@ MISSING_ID = "3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10"
 # --- 1. Schema-based fuzzing -------------------------------------------------------------
 
 
+# Razorpay's webhook rejects every request without its real signature, schema-valid or not;
+# tests/test_billing.py covers it with signed requests.
+SIGNED_BY_RAZORPAY = {("POST", "/api/payments/webhook")}
+
+
 @schema.parametrize()
 def test_fuzz_every_operation_matches_contract(case):
-    case.call_and_validate()
+    signed = (case.method.upper(), case.path) in SIGNED_BY_RAZORPAY
+    case.call_and_validate(excluded_checks=[positive_data_acceptance] if signed else None)
 
 
 # --- helpers -----------------------------------------------------------------------------
