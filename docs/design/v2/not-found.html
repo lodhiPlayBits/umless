@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>umless · Not found</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<link rel="stylesheet" href="assets/app.css">
+<script src="assets/theme.js"></script>
+<script src="assets/states.js"></script>
+<style>
+  .nf { min-height: calc(100vh - var(--bar-h)); display: grid; place-items: center; padding: var(--space-7) var(--space-4); text-align: center; }
+  .nf-inner { display: grid; gap: var(--space-4); justify-items: center; max-width: 480px; }
+  .nf-code { font: 600 96px/1 var(--font-mono); letter-spacing: -0.04em; color: var(--color-text); }
+  .nf-code .filler { padding: 0 12px; border-radius: var(--radius-md); }
+</style>
+</head>
+<body data-states="page:Page not found,question:Question deleted">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+</svg>
+<div class="design-bar">
+  <div class="container inner">
+    <a class="logo" href="index.html" style="font-size:16px">um<span>less</span></a>
+    <span class="label">Design · Not found</span>
+    <div class="scroller"><div class="segmented" role="group" aria-label="State" id="state-picker"></div></div>
+    <button class="btn btn-secondary icon-btn theme-toggle" data-theme-toggle type="button"><svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg></button>
+  </div>
+</div>
+<main class="nf">
+  <div class="nf-inner">
+    <a class="logo" href="landing.html">um<span>less</span></a>
+    <p class="nf-code" aria-hidden="true" data-when="page">4<span class="filler">uh</span>4</p>
+    <h1 class="text-2xl" data-when="page">That page doesn't exist</h1>
+    <p class="muted" data-when="page">The link may be old or mistyped.</p>
+    <div class="icon-tile" data-when="question"><svg class="icon"><use href="#i-list"/></svg></div>
+    <h1 class="text-2xl" data-when="question">That question doesn't exist any more</h1>
+    <p class="muted" data-when="question">It may have been deleted, maybe in another tab.</p>
+    <div class="row" style="justify-content:center">
+      <a class="btn btn-primary" href="app-questions.html">Back to questions</a>
+      <a class="btn btn-ghost" href="landing.html" data-when="page">Home</a>
+    </div>
+  </div>
+</main>
+</body>
+</html>

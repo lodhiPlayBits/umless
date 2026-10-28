@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>umless · Sign in screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<script src="assets/theme.js"></script>
+<style>
+  /* Design toolbar: not part of the product UI. Picks the screen and its state. */
+  .design-bar { position: sticky; top: 0; z-index: 30; background: var(--color-surface); border-bottom: 1px dashed var(--color-border); }
+  .design-bar .inner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); padding-block: var(--space-2); }
+  .design-bar .label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+  .design-bar .scroller { max-width: 100%; overflow-x: auto; }
+  .design-bar .segmented button { min-height: 36px; padding: 0 14px; white-space: nowrap; }
+  .design-bar .theme-toggle { margin-left: auto; }
+
+  .auth { display: grid; min-height: calc(100vh - 57px); }
+  @media (min-width: 960px) { .auth { grid-template-columns: 1fr 1fr; } }
+  .auth-main { display: flex; flex-direction: column; padding: var(--space-5) var(--space-4) var(--space-7); }
+  @media (min-width: 768px) { .auth-main { padding: var(--space-6) var(--space-7) var(--space-7); } }
+  .auth-main > .logo { align-self: flex-start; }
+  .auth-form { width: 100%; max-width: 400px; margin: auto; padding-top: var(--space-7); display: grid; gap: var(--space-5); }
+  .auth-form h1 { font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em; }
+  .auth-form form { display: grid; gap: var(--space-4); }
+  .auth-alt { text-align: center; font-size: 14px; line-height: 20px; color: var(--color-text-muted); }
+  .divider { display: flex; align-items: center; gap: var(--space-3); font-size: 13px; color: var(--color-text-muted); }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
+  .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+  .label-row a { font-size: 14px; text-decoration: none; font-weight: 500; }
+  .password { position: relative; }
+  .password .input { padding-right: 52px; }
+  .password button { position: absolute; top: 4px; right: 4px; }
+  .strength { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .strength span { height: 4px; border-radius: 2px; background: var(--color-border); }
+  .strength[data-level="1"] span:nth-child(-n+1) { background: var(--color-danger); }
+  .strength[data-level="3"] span:nth-child(-n+3) { background: var(--color-success); }
+  .legal { font-size: 13px; line-height: 18px; color: var(--color-text-muted); }
+  .banner-info { border-color: color-mix(in srgb, var(--color-primary) 40%, transparent); background: var(--primary-tint); }
+  .banner-info > .icon { color: var(--color-primary); margin-top: 2px; }
+  .banner-success { border-color: color-mix(in srgb, var(--color-success) 45%, transparent); background: color-mix(in srgb, var(--color-success) 8%, var(--color-bg)); }
+  .banner-success > .icon { color: var(--color-success); margin-top: 2px; }
+  .banner a { font-weight: 600; }
+  .big-icon { width: 56px; height: 56px; border-radius: var(--radius-full); display: grid; place-items: center; background: var(--primary-tint); color: var(--color-primary); }
+  .big-icon .icon { width: 26px; height: 26px; }
+
+  .auth-aside { display: none; }
+  @media (min-width: 960px) {
+    .auth-aside { display: flex; align-items: center; justify-content: center; padding: var(--space-7); background: var(--color-surface); border-left: 1px solid var(--color-border); }
+  }
+  .aside-inner { max-width: 460px; display: grid; gap: var(--space-5); }
+
+  [data-when]:not(.on) { display: none !important; }
+  .screen:not(.on) { display: none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+  <symbol id="i-google" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M21 12.2c0-.7-.1-1.3-.2-1.9H12v3.6h5.1a4.4 4.4 0 0 1-1.9 2.9v2.4h3.1c1.7-1.6 2.7-4 2.7-7z"/><path d="M12 21.5c2.6 0 4.7-.9 6.3-2.3l-3.1-2.4c-.9.6-2 .9-3.2.9-2.5 0-4.6-1.7-5.3-3.9H3.5v2.5a9.5 9.5 0 0 0 8.5 5.2z"/><path d="M6.7 13.8a5.7 5.7 0 0 1 0-3.6V7.7H3.5a9.5 9.5 0 0 0 0 8.6z"/><path d="M12 6.3c1.4 0 2.6.5 3.6 1.4l2.7-2.7A9.5 9.5 0 0 0 3.5 7.7l3.2 2.5c.7-2.2 2.8-3.9 5.3-3.9z"/></symbol>
+</svg>
+
+<div class="design-bar">
+  <div class="container inner">
+    <a class="logo" href="index.html" style="font-size:16px">um<span>less</span></a>
+    <span class="label">Design · Sign-in screens</span>
+    <div class="scroller"><div class="segmented" role="group" aria-label="Screen" id="screen-picker">
+      <button type="button" data-screen="signup">Sign up</button>
+      <button type="button" data-screen="login">Log in</button>
+      <button type="button" data-screen="forgot">Forgot password</button>
+      <button type="button" data-screen="check">Check email</button>
+      <button type="button" data-screen="reset">Reset password</button>
+    </div></div>
+    <div class="scroller"><div class="segmented" role="group" aria-label="State" id="state-picker"></div></div>
+    <button class="btn btn-secondary icon-btn theme-toggle" data-theme-toggle type="button">
+      <svg class="icon i-moon"><use href="#i-moon"/></svg><svg class="icon i-sun"><use href="#i-sun"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="auth">
+  <main class="auth-main">
+    <a class="logo" href="landing.html">um<span>less</span></a>
+
+    <!-- Sign up -->
+    <section class="screen auth-form" id="screen-signup" data-states="default:Default,errors:With errors,sending:Submitting" aria-labelledby="signup-title">
+      <div class="stack" style="gap:var(--space-2)">
+        <h1 id="signup-title">Create your account</h1>
+        <p class="muted">Free to start. No card needed.</p>
+      </div>
+      <div class="banner banner-danger" data-when="errors" role="alert">
+        <svg class="icon"><use href="#i-alert"/></svg>
+        <span>An account with this email already exists. <a href="#login">Log in instead</a></span>
+      </div>
+      <button class="btn btn-secondary btn-block" type="button"><svg class="icon"><use href="#i-google"/></svg>Continue with Google</button>
+      <div class="divider">or</div>
+      <form onsubmit="return false">
+        <div class="field"><label class="label" for="su-name">Name</label><input class="input" id="su-name" autocomplete="name" placeholder="Your name"></div>
+        <div class="field">
+          <label class="label" for="su-email">Email</label>
+          <input class="input" id="su-email" type="email" autocomplete="email" placeholder="name@example.com" data-invalid-in="errors">
+        </div>
+        <div class="field">
+          <label class="label" for="su-pass">Password</label>
+          <div class="password"><input class="input" id="su-pass" type="password" autocomplete="new-password" value="abc12" data-invalid-in="errors"><button class="btn btn-ghost icon-btn" type="button" data-reveal aria-label="Show password"><svg class="icon"><use href="#i-eye"/></svg></button></div>
+          <span class="hint" data-when="default sending">At least 8 characters.</span>
+          <span class="field-error" data-when="errors"><svg class="icon" style="width:16px;height:16px"><use href="#i-alert"/></svg>Use at least 8 characters. 5 now.</span>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" data-when="default errors">Create account</button>
+        <button class="btn btn-primary btn-block" type="button" data-when="sending" aria-disabled="true">Creating account…</button>
+        <p class="legal">By creating an account you agree to the <a href="#">Terms</a> and <a href="#">Privacy policy</a>.</p>
+      </form>
+      <p class="auth-alt">Already have an account? <a href="#login">Log in</a></p>
+    </section>
+
+    <!-- Log in -->
+    <section class="screen auth-form" id="screen-login" data-states="default:Default,errors:Wrong password,expired:Session ended,locked:Too many tries" aria-labelledby="login-title">
+      <div class="stack" style="gap:var(--space-2)">
+        <h1 id="login-title">Welcome back</h1>
+        <p class="muted">Log in to keep practising.</p>
+      </div>
+      <div class="banner banner-info" data-when="expired" role="status">
+        <svg class="icon"><use href="#i-info"/></svg>
+        <span>Your session ended. Log in again and we'll bring you back to your question.</span>
+      </div>
+      <div class="banner banner-danger" data-when="errors" role="alert">
+        <svg class="icon"><use href="#i-alert"/></svg>
+        <span>That email and password don't match. Try again or <a href="#forgot">reset your password</a>.</span>
+      </div>
+      <div class="banner banner-danger" data-when="locked" role="alert">
+        <svg class="icon"><use href="#i-clock"/></svg>
+        <span>Too many tries. Wait 5 minutes, or <a href="#forgot">reset your password</a>.</span>
+      </div>
+      <button class="btn btn-secondary btn-block" type="button"><svg class="icon"><use href="#i-google"/></svg>Continue with Google</button>
+      <div class="divider">or</div>
+      <form onsubmit="return false">
+        <div class="field"><label class="label" for="li-email">Email</label><input class="input" id="li-email" type="email" autocomplete="email" value="name@example.com"></div>
+        <div class="field">
+          <div class="label-row"><label class="label" for="li-pass">Password</label><a href="#forgot">Forgot password?</a></div>
+          <div class="password"><input class="input" id="li-pass" type="password" autocomplete="current-password" value="password1" data-invalid-in="errors"><button class="btn btn-ghost icon-btn" type="button" data-reveal aria-label="Show password"><svg class="icon"><use href="#i-eye"/></svg></button></div>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" data-when="default errors expired">Log in</button>
+        <button class="btn btn-primary btn-block" type="button" data-when="locked" aria-disabled="true">Log in</button>
+      </form>
+      <p class="auth-alt">New to umless? <a href="#signup">Create an account</a></p>
+    </section>
+
+    <!-- Forgot password -->
+    <section class="screen auth-form" id="screen-forgot" data-states="default:Default,errors:Invalid email" aria-labelledby="forgot-title">
+      <a class="btn btn-ghost btn-sm" href="#login" style="justify-self:start;margin-left:-14px"><svg class="icon"><use href="#i-arrow-left"/></svg>Back to log in</a>
+      <div class="stack" style="gap:var(--space-2)">
+        <h1 id="forgot-title">Reset your password</h1>
+        <p class="muted">Enter the email you signed up with. We'll send you a link to set a new password.</p>
+      </div>
+      <form onsubmit="location.hash='check'; return false">
+        <div class="field">
+          <label class="label" for="fp-email">Email</label>
+          <input class="input" id="fp-email" type="email" autocomplete="email" placeholder="name@example.com" data-invalid-in="errors">
+          <span class="field-error" data-when="errors"><svg class="icon" style="width:16px;height:16px"><use href="#i-alert"/></svg>Enter a full email address, like name@example.com</span>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Send reset link</button>
+      </form>
+      <p class="hint">For privacy, we show the next screen even if no account uses this email.</p>
+    </section>
+
+    <!-- Check email (after forgot password, or after sign-up to confirm the address) -->
+    <section class="screen auth-form" id="screen-check" data-states="default:Reset link sent,verify:Confirm sign-up,resent:Link resent" aria-labelledby="check-title">
+      <div class="big-icon"><svg class="icon"><use href="#i-mail"/></svg></div>
+      <div class="stack" style="gap:var(--space-2)">
+        <h1 id="check-title" data-when="default resent">Check your email</h1>
+        <h1 data-when="verify">Confirm your email</h1>
+        <p class="muted" data-when="default resent">We sent a password reset link to <strong style="color:var(--color-text)">name@example.com</strong>. It works for 30 minutes.</p>
+        <p class="muted" data-when="verify">We sent a link to <strong style="color:var(--color-text)">name@example.com</strong>. Open it to finish creating your account.</p>
+      </div>
+      <div class="banner banner-success" data-when="resent" role="status">
+        <svg class="icon"><use href="#i-check"/></svg><span>New link sent. Check your spam folder too.</span>
+      </div>
+      <div class="stack" style="gap:var(--space-3)">
+        <button class="btn btn-secondary btn-block" type="button" data-when="default verify">Resend link</button>
+        <button class="btn btn-secondary btn-block" type="button" data-when="resent" aria-disabled="true">Resend in <span class="mono">0:42</span></button>
+        <a class="btn btn-ghost btn-block" href="#forgot" data-when="default resent">Use a different email</a>
+        <a class="btn btn-ghost btn-block" href="#signup" data-when="verify">Use a different email</a>
+      </div>
+      <p class="hint">Didn't get it? Check your spam folder, or wait a minute and resend.</p>
+    </section>
+
+    <!-- Reset password (opened from the email link) -->
+    <section class="screen auth-form" id="screen-reset" data-states="default:Default,errors:Don't match,expired:Link expired,done:Saved" aria-labelledby="reset-title">
+      <div class="stack" style="gap:var(--space-2)" data-when="default errors">
+        <h1 id="reset-title">Choose a new password</h1>
+        <p class="muted">For name@example.com</p>
+      </div>
+      <form onsubmit="return false" data-when="default errors">
+        <div class="field">
+          <label class="label" for="rp-pass">New password</label>
+          <div class="password"><input class="input" id="rp-pass" type="password" autocomplete="new-password" value="practise-daily"><button class="btn btn-ghost icon-btn" type="button" data-reveal aria-label="Show password"><svg class="icon"><use href="#i-eye"/></svg></button></div>
+          <div class="strength" data-level="3" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <span class="hint">Strong. At least 8 characters.</span>
+        </div>
+        <div class="field">
+          <label class="label" for="rp-confirm">Confirm new password</label>
+          <div class="password"><input class="input" id="rp-confirm" type="password" autocomplete="new-password" value="practise-dialy" data-invalid-in="errors"><button class="btn btn-ghost icon-btn" type="button" data-reveal aria-label="Show password"><svg class="icon"><use href="#i-eye"/></svg></button></div>
+          <span class="field-error" data-when="errors"><svg class="icon" style="width:16px;height:16px"><use href="#i-alert"/></svg>The passwords don't match.</span>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Save new password</button>
+      </form>
+
+      <div class="big-icon" data-when="expired" style="color:var(--color-warning);background:color-mix(in srgb, var(--color-warning) 12%, var(--color-bg))"><svg class="icon"><use href="#i-clock"/></svg></div>
+      <div class="stack" style="gap:var(--space-2)" data-when="expired">
+        <h1>This link has expired</h1>
+        <p class="muted">Reset links work for 30 minutes and only once. Ask for a new one.</p>
+      </div>
+      <a class="btn btn-primary btn-block" href="#forgot" data-when="expired">Send a new link</a>
+
+      <div class="big-icon" data-when="done" style="color:var(--color-success);background:color-mix(in srgb, var(--color-success) 12%, var(--color-bg))"><svg class="icon"><use href="#i-check"/></svg></div>
+      <div class="stack" style="gap:var(--space-2)" data-when="done">
+        <h1>Password saved</h1>
+        <p class="muted">You're logged in. Other devices have been logged out.</p>
+      </div>
+      <a class="btn btn-primary btn-block" href="#" data-when="done">Go to dashboard</a>
+    </section>
+  </main>
+
+  <aside class="auth-aside" aria-hidden="true">
+    <div class="aside-inner">
+      <h2 class="h-section">Practise out loud.<br>Say less <span class="filler" style="padding:0 8px;border-radius:var(--radius-md)">um</span>.</h2>
+      <div class="mock">
+        <div class="mock-bar"><i></i><i></i><i></i><span class="badge badge-success">Result · 0:58</span></div>
+        <div class="mock-body">
+          <p class="transcript">I think my biggest strength is, <span class="filler">uh</span>, staying calm. <span class="pause">··</span> Last month, <span class="filler">um</span>, our release broke on a Friday.</p>
+          <div class="summary"><span class="badge">0:58</span><span class="badge">131 wpm</span><span class="badge">um ×1 · uh ×1</span></div>
+        </div>
+      </div>
+      <ul class="check-list text-sm"><li>Fillers and pauses, highlighted</li><li>Your pace in words per minute</li><li>Recordings aren't stored on our server</li></ul>
+    </div>
+  </aside>
+</div>
+
+<script>
+  // Prototype wiring: the hash picks the screen (so in-form links work), the State bar picks its variant.
+  var screens = document.querySelectorAll('.screen');
+  var statePicker = document.getElementById('state-picker');
+
+  function setState(screen, state) {
+    screen.querySelectorAll('[data-when]').forEach(function (el) {
+      el.classList.toggle('on', el.dataset.when.split(' ').indexOf(state) !== -1);
+    });
+    screen.querySelectorAll('[data-invalid-in]').forEach(function (el) {
+      if (el.dataset.invalidIn === state) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
+    });
+    statePicker.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.state === state)); });
+  }
+
+  function show(id) {
+    // Section ids are "screen-<name>" so the URL hash never scrolls the page to the section.
+    var screen = Array.prototype.find.call(screens, function (s) { return s.id === 'screen-' + id; }) || screens[0];
+    screens.forEach(function (s) { s.classList.toggle('on', s === screen); });
+    document.querySelectorAll('#screen-picker button').forEach(function (b) { b.setAttribute('aria-pressed', String('screen-' + b.dataset.screen === screen.id)); });
+    statePicker.innerHTML = '';
+    screen.dataset.states.split(',').forEach(function (pair) {
+      var parts = pair.split(':');
+      var b = document.createElement('button');
+      b.type = 'button'; b.dataset.state = parts[0]; b.textContent = parts[1];
+      b.addEventListener('click', function () { setState(screen, parts[0]); });
+      statePicker.appendChild(b);
+    });
+    setState(screen, 'default');
+    window.scrollTo(0, 0);
+  }
+
+  document.querySelectorAll('#screen-picker button').forEach(function (b) {
+    b.addEventListener('click', function () { location.hash = b.dataset.screen; });
+  });
+  document.addEventListener('click', function (event) {
+    var reveal = event.target.closest('[data-reveal]');
+    if (!reveal) return;
+    var input = reveal.previousElementSibling;
+    var showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    reveal.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  });
+  window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+  show(location.hash.slice(1) || 'signup');
+</script>
+</body>
+</html>

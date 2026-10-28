@@ -9,7 +9,15 @@ Date: 2026-10-28 · Status: approved 2026-10-28; Phases 0–1 built in Figma, no
   - Pages are `Design system`, `Marketing & Auth` and `App`, with Sections inside them instead of separate pages.
   - Dark mode uses two collections, `Color · Light` and `Color · Dark`, with the same 14 token names. Dark frames are made by cloning the Light frame and swapping its variables.
 - 2026-10-28: Built: variables (24 primitives, 14 colour tokens per theme, 15 layout tokens with `var(--…)` code syntax), 11 text styles, 3 shadow styles, and the Cover, Moodboard and Foundations (Light and Dark) sections. Not yet screenshot-checked, because the MCP call limit was reached.
-- 2026-10-28: The Starter plan allows 20 MCP calls a month, so design moved to static HTML in `docs/design/v2/` (same tokens, real light/dark toggle). The Figma file stays as a reference. Done: `assets/theme.css` and `assets/theme.js`, `components.html`, `landing.html`, `pricing.html`, and the `index.html` hub. Preview with the `design-v2` entry in `.claude/launch.json` (port 5181). Next: auth, then the app screens.
+- 2026-10-28: The Starter plan allows 20 MCP calls a month, so design moved to static HTML in `docs/design/v2/` (same tokens, real light/dark toggle). The Figma file stays as a reference. Done: `assets/theme.css` and `assets/theme.js`, `components.html`, `landing.html`, `pricing.html`, and the `index.html` hub. Preview with the `design-v2` entry in `.claude/launch.json` (port 5181).
+- 2026-10-28: Built `auth.html` (Phase 4), a clickable prototype of sign up, log in, forgot password, check email and reset password, with 16 states including errors, session ended, too many tries, expired link and confirm sign-up. "Log in" and "Start free" on the landing and pricing pages now link to it.
+- 2026-10-28: Phase 5, part 1: the app shell (sidebar on desktop, bottom tabs on phones; `assets/app.css`, `assets/states.js`) and three screens:
+  - `app-dashboard.html`: returning user and first visit.
+  - `app-questions.html`: F1–F2 in 8 states.
+  - `app-practice.html`: F3–F4 in 10 states, covering E1, E5 and E8–E12.
+  - Part 2, done the same day: `app-history.html` (all takes, one question's progress, empty, Free-plan lock), `app-settings.html` (profile and privacy, Free and Pro billing, free limit reached, payment worked or failed, delete account) and `not-found.html`. Phase 5 is complete; next is Phase 6 (responsive and accessibility pass) and Phase 7 (prototype test with 3–5 people).
+  - Proposals to confirm: Settings has "Keep my takes in History" (on) and "Keep audio too" (off, 30 days). These answer part of the open v1.1 privacy questions.
+  - Questions and Practice show per-question history (takes, fillers per minute, "fewer than last time"). These depend on the open v1.1 history decisions.
 
 ## Goal
 
