@@ -18,7 +18,7 @@ else
         mkdir -p "${SSL_DIR}/${SELF}"
         # An IP address needs an IP SAN; a name needs a DNS SAN.
         case "${SERVER_NAME}" in
-            *[!0-9.]*) san="DNS:${SERVER_NAME}" ;;
+            *[!0-9.]*) san="DNS:${SERVER_NAME},DNS:www.${SERVER_NAME}" ;;
             *)         san="IP:${SERVER_NAME}" ;;
         esac
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 \

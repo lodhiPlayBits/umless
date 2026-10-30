@@ -14,17 +14,34 @@ upstream umless_frontend {
 }
 
 # --- Plain HTTP: ACME challenge + redirect everything else to HTTPS ---
+# default_server, so it also answers www.${SERVER_NAME} (whose ACME challenge certbot needs).
 server {
     listen 80 default_server;
-    server_name ${SERVER_NAME};
+    server_name ${SERVER_NAME} www.${SERVER_NAME};
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
+    # Straight to the canonical name: http://www... is one redirect, not two.
     location / {
-        return 301 https://$host$request_uri;
+        return 301 https://${SERVER_NAME}$request_uri;
     }
+}
+
+# --- HTTPS www: redirect to the canonical name ---
+# The certificate covers both names (init-letsencrypt.sh), so this answers without a warning.
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name www.${SERVER_NAME};
+
+    ssl_certificate     /etc/nginx/ssl/active/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/active/privkey.pem;
+    include /etc/nginx/snippets/ssl-params.conf;
+    include /etc/nginx/snippets/security-headers.conf;
+
+    return 301 https://${SERVER_NAME}$request_uri;
 }
 
 # --- HTTPS: gateway in front of the frontend and the API ---
