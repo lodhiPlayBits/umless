@@ -1,10 +1,17 @@
-import { useClerk } from '@clerk/react'
-import { PracticeTimePanel } from '@/features/billing'
+import { UserProfile } from '@clerk/react'
+import { BillingPanel } from '@/features/billing'
+import type { PageProps } from '@/pages/types'
+import { PATHS } from '@/shared/config/paths'
 import { useSession } from '@/shared/lib/session'
 import { setThemePreference, useThemePreference } from '@/shared/theme'
 import type { ThemePreference } from '@/shared/theme'
-import { Button, Panel, Segmented } from '@/shared/ui'
+import { Panel, Segmented, Tabs } from '@/shared/ui'
 import './SettingsPage.css'
+
+const TABS = [
+  { to: PATHS.settings, label: 'Profile' },
+  { to: PATHS.settingsBilling, label: 'Billing' },
+] as const
 
 const THEMES = [
   { value: 'light', label: 'Light' },
@@ -12,34 +19,38 @@ const THEMES = [
   { value: 'system', label: 'System' },
 ] as const
 
-/** Only rendered with Clerk on: useClerk needs its provider. */
-function AccountPanel() {
-  const clerk = useClerk()
-  return (
-    <Panel title="Account">
-      <p className="muted">Your name, email, password and sign-in methods, and deleting your account.</p>
-      <div>
-        <Button icon="user" onClick={() => clerk.openUserProfile()}>
-          Manage account
-        </Button>
-      </div>
-    </Panel>
-  )
-}
-
-// Phase 3: the settings that already exist; Phase 9 adds the profile and billing tabs.
-export default function SettingsPage() {
-  const theme = useThemePreference()
-  const { auth } = useSession()
+/** Settings (docs/design/v2/app-settings.html): Profile and Billing tabs, each its own URL. */
+export default function SettingsPage({ params }: PageProps) {
+  const billing = params.tab === 'billing'
   return (
     <div className="settings-page">
       <h1>Settings</h1>
+      <Tabs label="Settings" current={billing ? PATHS.settingsBilling : PATHS.settings} tabs={TABS} />
+      {billing ? <BillingPanel /> : <Profile />}
+    </div>
+  )
+}
+
+function Profile() {
+  const theme = useThemePreference()
+  const { auth } = useSession()
+  return (
+    <>
       <Panel title="Appearance">
         <p className="muted">System follows your device's light or dark setting.</p>
         <Segmented<ThemePreference> label="Theme" value={theme} onChange={setThemePreference} options={THEMES} />
       </Panel>
-      <PracticeTimePanel />
-      {auth === 'clerk' && <AccountPanel />}
-    </div>
+      <Panel title="Account">
+        {auth === 'clerk' ? (
+          // Clerk's own profile: name, email, password, sign-in methods, devices and deleting the account.
+          <UserProfile
+            routing="hash"
+            appearance={{ elements: { rootBox: 'settings-clerk', cardBox: 'settings-clerk__card', navbar: 'settings-clerk__nav' } }}
+          />
+        ) : (
+          <p className="muted">Sign-in is off on this server, so there is no account to manage.</p>
+        )}
+      </Panel>
+    </>
   )
 }

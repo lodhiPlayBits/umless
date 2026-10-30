@@ -84,6 +84,9 @@ function createLevelMeter(stream: MediaStream): { level: () => number | null; cl
   if (typeof AudioContext === 'undefined') return { level: () => null, close: () => {} }
   try {
     const context = new AudioContext()
+    // Created after `await getUserMedia()`, outside the click, so Chrome may start it suspended,
+    // and a suspended context gives the analyser silence. The click already allowed audio, so resume.
+    if (context.state === 'suspended') void context.resume().catch(() => {})
     const analyser = context.createAnalyser()
     analyser.fftSize = 512
     context.createMediaStreamSource(stream).connect(analyser)

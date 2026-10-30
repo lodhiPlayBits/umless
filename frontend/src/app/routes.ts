@@ -126,6 +126,18 @@ export const ROUTES: readonly RouteDef[] = [
     title: 'Settings',
     page: SettingsPage,
     nav: { label: 'Settings', icon: 'settings', order: 90 },
+    params: { tab: 'profile' },
+    width: 'wide',
+  },
+  {
+    id: 'settingsBilling',
+    pattern: PATHS.settingsBilling,
+    access: 'signedIn',
+    layout: 'app',
+    title: 'Billing',
+    page: SettingsPage,
+    parent: 'settings',
+    params: { tab: 'billing' },
     width: 'wide',
   },
   ...LEGAL_PAGES.map(

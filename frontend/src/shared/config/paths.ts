@@ -16,6 +16,7 @@ export const PATHS = {
   questionHistory: '/history/:questionId',
   take: '/takes/:takeId',
   settings: '/settings',
+  settingsBilling: '/settings/billing',
 } as const
 
 /** Where a signed-in user lands. */

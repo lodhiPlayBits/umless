@@ -8,6 +8,11 @@ import { createContext, useContext } from 'react'
 export type Session = {
   auth: 'clerk' | 'local'
   status: 'loading' | 'signedIn' | 'signedOut'
+  /**
+   * While loading: whether a session cookie suggests the visitor is signed in. With no hint of a
+   * session, public pages can render before the auth provider has loaded.
+   */
+  maybeSignedIn?: boolean
 }
 
 export const LOCAL_SESSION: Session = { auth: 'local', status: 'signedIn' }

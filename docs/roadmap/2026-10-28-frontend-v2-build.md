@@ -1,6 +1,6 @@
 # Roadmap: build the v2 frontend
 
-Date: 2026-10-28 · Status: approved 2026-10-28 (all four decisions below) · Architecture: ADR 0005 · Design: `docs/design/v2/`
+Date: 2026-10-28 · Status: done 2026-10-30 (approved 2026-10-28) · Architecture: ADR 0005 · Design: `docs/design/v2/`
 
 ## Goal
 
@@ -133,6 +133,40 @@ Done when:
     - unit tests: 433 passed;
     - Playwright: 82 passed;
     - screenshots of the first visit (empty, and with a question) and of returning (desktop and phone). From them I made the streak line say which day you practised.
+
+- 2026-10-30: **Phase 9 done.**
+  - Settings has two tabs, each its own URL:
+    - `/settings` (Profile): theme, plus Clerk's `<UserProfile>` embedded and themed (name, email, password, sign-in methods, delete account).
+    - `/settings/billing` (Billing): balance; one card per pack with price per minute and "Best value"; "Payment worked" with the new balance; "The payment didn't go through" with a Try again that retries the same pack; a note for servers without payments.
+  - `usePurchase` with `purchaseErrorMessage` is the one purchase flow, shared by the BuyTime dialog and the Billing tab.
+  - `OutOfTimeBanner` (no free transcriptions and no paid time) shows on Billing and on the Dashboard.
+  - The pricing page's buy buttons go to `/settings/billing`.
+  - Results:
+    - unit tests: 446 passed;
+    - Playwright: 82 passed;
+    - screenshots of Profile, Billing (desktop and phone), out of time, and the Dashboard with the banner.
+  - **Still open (needs your decision):** deleting a Clerk account doesn't delete that user's questions, takes, transcripts or balance. It needs a Clerk `user.deleted` webhook and a signing secret (`CLERK_WEBHOOK_SECRET`).
+
+- 2026-10-30: **Phase 10 done. The roadmap is complete.**
+  - Accessibility:
+    - `tests/e2e/a11y.spec.ts` (`@axe-core/playwright` 4.14.0) checks 11 pages in light and dark, at 375 and 1280 px, against WCAG 2.2 AA. It fails on serious or critical issues, and on a page that rendered nothing.
+    - It found one real issue, an `aria-label` on a generic `<div>` (the take lists), now fixed.
+    - The live audit of landing, sign-in, pricing and privacy (signed out) found no issues of ours. The one serious item is Clerk's "Secured by" text on its striped "Development mode" footer, which goes away with a production Clerk instance.
+  - Performance:
+    - The app shell is now lazy-loaded, so the public site no longer downloads the sidebar, billing or checkout code. The entry JavaScript went from 120.9 to 115.5 kB gzipped; landing's total JavaScript is about 118 kB (budget 120).
+    - Public pages render before Clerk has loaded when no `__client_uat` session cookie suggests a sign-in (`renderStatus` in `app/access.ts`). Landing LCP on simulated 4G went from 2.57 s to about 0.88 s (3 runs). App pages, and visitors who may be signed in, still wait for Clerk.
+  - Docs: CLAUDE.md now describes the live app, the container-based commands and the open items; `docs/design/flows.md` has F5–F9.
+  - Rollback: before deploying I tagged the previously running images `umless-frontend:rollback-20261030-1720` and `umless-backend:rollback-20261030-1720`.
+  - Results:
+    - unit tests: 455 passed;
+    - Playwright: 86 passed (82 flows plus 4 accessibility runs);
+    - backend: 528 passed (Phase 7).
+  - **Left for you:**
+    - the Clerk account-deletion webhook (decision);
+    - a production Clerk instance;
+    - the live Razorpay webhook secret;
+    - one real ₹40 purchase on the Billing tab;
+    - commit and push.
 
 ## Where the design and the live product differ (decided here, unless you say otherwise)
 

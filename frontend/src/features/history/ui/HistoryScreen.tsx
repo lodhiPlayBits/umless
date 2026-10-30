@@ -74,7 +74,7 @@ export default function HistoryScreen({ now = new Date() }: { now?: Date }) {
         </EmptyState>
       )}
       {takes.isSuccess && takes.data.length > 0 && (
-        <List as="div" aria-label="Takes">
+        <List as="div">
           {groupByDay(takes.data, now).map((group) => (
             <div key={group.label} role="group" aria-label={group.label}>
               <ListGroupLabel>{group.label}</ListGroupLabel>

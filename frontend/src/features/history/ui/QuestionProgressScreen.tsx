@@ -65,7 +65,7 @@ export default function QuestionProgressScreen({ questionId, now = new Date() }:
               />
             </Panel>
           )}
-          <List as="div" aria-label="Takes">
+          <List as="div">
             {takes.data.map((take) => (
               <TakeRow key={take.id} take={take} title={whenLabel(take, now)} meta={takeStats(take)} best={best.has(take.id)} />
             ))}

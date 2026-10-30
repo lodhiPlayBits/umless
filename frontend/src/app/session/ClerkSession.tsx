@@ -4,11 +4,14 @@ import { navigate } from '@/shared/lib/router'
 import { clerkAppearance } from '@/shared/theme'
 import { PATHS } from '@/shared/config/paths'
 import { SessionContext } from '@/shared/lib/session'
+import { hasClerkSessionCookie } from './sessionCookie'
+
+const maybeSignedIn = hasClerkSessionCookie()
 
 function FromClerk({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn } = useAuth()
   const status = !isLoaded ? 'loading' : isSignedIn ? 'signedIn' : 'signedOut'
-  return <SessionContext.Provider value={{ auth: 'clerk', status }}>{children}</SessionContext.Provider>
+  return <SessionContext.Provider value={{ auth: 'clerk', status, maybeSignedIn }}>{children}</SessionContext.Provider>
 }
 
 /** Clerk sign-in for the deployed site. Clerk's own redirects go through our router (no reloads). */

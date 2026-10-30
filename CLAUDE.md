@@ -2,7 +2,7 @@
 
 Speech-practice web app. You keep a list of practice questions, record a spoken answer in the browser, and get a Deepgram transcript that keeps filler words ("um", "uh", "mhmm") and marks pauses of 1 s or more as dots, plus a summary (pace, filler counts, pauses). You can replay and download the audio and a `.txt` transcript.
 
-v1.0.0 is released: local, single user, no auth, nothing about a recording stored on the server.
+Live at https://umless.in (Docker: nginx gateway, FastAPI backend, static frontend; `deploy/`). Sign-in with Clerk (ADR 0003), MySQL HeatWave, transcripts saved per user in an OCI bucket (audio never stored), Razorpay practice-time packs (ADR 0004). The v2 frontend (ADR 0005, roadmap `docs/roadmap/2026-10-28-frontend-v2-build.md`) is built: marketing site, dashboard, questions, practice, history, settings and billing. Without the `.env` keys it still runs as v1 did: local, single user, nothing stored but the questions file.
 
 ## Where things are
 
@@ -58,13 +58,15 @@ Git Bash on Windows. The backend venv is the Windows one; WSL uses `.venv/Script
 
 Run without a Deepgram key: set `UMLESS_TRANSCRIBER=fake`. The real key goes in `backend/.env` (see `backend/.env.example`). `pytest --run-live` makes one real Deepgram call.
 
+On the Oracle server there is no Node or Python on the host: run checks in containers (`node:22-alpine` for the frontend, `python:3.12-slim` for the backend, `mcr.microsoft.com/playwright:v1.64.1-noble` for e2e with `UMLESS_PYTHON` pointing at a venv inside it), then `sudo chown -R ubuntu:ubuntu` what they wrote. Deploy with `sg docker -c 'docker compose up -d --build <service>'` in `deploy/`, then `docker compose restart nginx`. MySQL tests need `UMLESS_TEST_DATABASE_URL` pointing at a throwaway database (every table is dropped): a temporary `mysql:8.4` container works.
+
 Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks during development used 8765 and 5174. Never test against 8000 with real data: point `UMLESS_DATA_FILE` at a scratch file and use another port.
 
 ## Rules that aren't obvious from the code
 
 - **Contract first.** `docs/api/openapi.yaml` wins over the code. Changing it needs the user's OK and a line in the `docs/BUILD.md` decisions log. After a change, run `npm run gen:api` and commit the regenerated `src/shared/api/generated/openapi.d.ts`.
 - **One error body.** Every non-2xx response is `{code, detail, fields?}` with a code from `ErrorCode`. Raise `ApiError` in app code, never `HTTPException`.
-- **Security shape** (ADR 0001): bound to 127.0.0.1, only `localhost`/`127.0.0.1` Host headers, no CORS (Vite `server.cors: false` too), JSON-only question writes. Don't loosen these.
+- **Security shape** (ADR 0001, 0003): the backend is reached only through the nginx gateway (which sends `Host: localhost`), only `localhost`/`127.0.0.1` Host headers are accepted, no CORS (Vite `server.cors: false` too), JSON-only question writes, and every endpoint but health needs a Clerk session when sign-in is on. Don't loosen these.
 - **Frontend layers** (ADR 0005): `app → pages → features → shared/content`. Another feature is imported only through `@/features/<name>`; inside a feature, imports are relative. ESLint enforces both.
 - **Frontend requests** (ADR 0002): only `*Api.ts` modules import the client (ESLint enforces it). Sort failures with `classifyApiError`. No hand-written `fetch` to contract endpoints.
 - **Pause dots** use the raw gap between words: `floor(gap + 0.001)` dots. The same rule drives `text`, `pause_count`, `longest_pause_seconds` and the frontend's highlighting (`summaryText.ts`). Change it everywhere or nowhere.
@@ -90,6 +92,8 @@ Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks
 
 ## Open items
 
-- v1.1 attempt history: phase 1 design is waiting on 8 interview questions (what a take stores, when it's saved, deletion, views, SQLite, questions migration). Agreed order: history before auth; auth only when the app is deployed or multi-user.
-- Not verified: a live Deepgram check with a real voice, Firefox and Safari.
+- Deleting a Clerk account doesn't delete that user's questions, takes, transcripts or balance: needs a Clerk `user.deleted` webhook (decision pending).
+- Launch: Clerk still on its development instance (`pk_test_`); live Razorpay webhook secret not set; refunded practice time is removed by hand.
+- E2E (`tests/e2e/a11y.spec.ts`) gates WCAG 2.2 AA on every signed-in and public page; the landing and sign-in pages only render signed out, so check them against the live site.
+- Not verified: Firefox and Safari.
 - Known minor issues from the v1.0.0 reviews are listed in `docs/builds/v1.0.0-BUILD.md`; check whether the refactor PRs (#4, #5) already fixed each one before working on it.

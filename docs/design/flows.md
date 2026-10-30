@@ -99,3 +99,14 @@ There is no login in v1, so there is no "unauthorized" state. When accounts arri
 | E22 | Keyboard-only or screen-reader user | all | Every action reachable by Tab; Space toggles recording on the practice screen; state changes announced via `aria-live` | — |
 | E23 | Reduced motion preferred | recording | No pulsing dot or animated meter; a static "Recording" badge instead | — |
 | E24 | Very many questions (100+) | `questions` | Plain scrolling list, plus a filter field once there are more than 10 | — |
+
+## F5–F9: the v2 app (ADR 0005)
+
+The redesign added these flows. Each screen's states are in its `docs/design/v2/` page; the behaviour is in the code named.
+
+- **F5 Sign up and sign in** (`auth.html`): Clerk's `<SignIn>`/`<SignUp>` on `/sign-in` and `/sign-up`, themed. An app URL while signed out goes to `/sign-in?redirect=…` and comes back after (`src/app/access.ts`).
+- **F6 Dashboard** (`app-dashboard.html`, `/dashboard`, the signed-in home): before the first take, a 3-step checklist with quick-add; after, a streak, "Practise next", this week against last week, an 8-week trend and recent takes (`src/features/dashboard`, numbers in `src/features/progress`).
+- **F7 History** (`app-history.html`): all takes by question and period (`/history`), one question's progress (`/history/:questionId`), one take with delete (`/takes/:takeId`) (`src/features/history`).
+- **F8 Buying practice time** (`app-settings.html` billing states, `/settings/billing`): packs, Razorpay Checkout, then "Payment worked" or "The payment didn't go through" with Try again; out of time shows a banner on Billing and the Dashboard; a 402 while transcribing offers Buy practice time (`src/features/billing`).
+- **F9 Settings** (`/settings`): theme, and Clerk's profile embedded (name, email, password, delete account).
+

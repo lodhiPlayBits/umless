@@ -37,7 +37,7 @@ describe('PricingCards', () => {
     unmount()
     render(as('signedIn', <PricingCards />))
     expect(screen.getAllByRole('link', { name: 'Buy time' })).toHaveLength(PRICING.packs.length)
-    for (const link of screen.getAllByRole('link', { name: 'Buy time' })) expect(link).toHaveAttribute('href', '/settings')
+    for (const link of screen.getAllByRole('link', { name: 'Buy time' })) expect(link).toHaveAttribute('href', '/settings/billing')
   })
 })
 

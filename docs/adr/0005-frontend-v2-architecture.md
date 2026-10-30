@@ -1,6 +1,6 @@
 # ADR 0005: Frontend architecture for the v2 redesign
 
-Status: accepted 2026-10-28 · Date: 2026-10-28 · Deciders: Gaurav Lodhi · Extends ADR 0002, replaces its decisions 6 and 7
+Status: accepted 2026-10-28, implemented 2026-10-30 · Date: 2026-10-28 · Deciders: Gaurav Lodhi · Extends ADR 0002, replaces its decisions 6 and 7
 
 ## Context
 

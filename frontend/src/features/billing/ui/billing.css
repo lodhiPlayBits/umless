@@ -1,0 +1,12 @@
+/* Settings → Billing (docs/design/v2/app-settings.html). Tokens only. */
+.billing { display: grid; gap: var(--space-5); }
+.billing p { margin: 0; }
+.billing__balance { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.billing__packs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.billing__pack { position: relative; display: grid; gap: var(--space-2); align-content: start; padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); }
+.billing__pack--best { border: 2px solid var(--color-primary); }
+.billing__ribbon.ui-badge { position: absolute; top: -12px; left: var(--space-5); background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
+.billing__pack-name { font-size: var(--text-lg); line-height: var(--leading-lg); }
+.billing__price { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing: -0.03em; }
+.billing__pack .ui-button { margin-top: var(--space-2); }
+.billing__note { font-size: var(--text-sm); line-height: var(--leading-sm); }

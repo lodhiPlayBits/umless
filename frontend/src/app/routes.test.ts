@@ -16,6 +16,7 @@ describe('resolveRoute', () => {
     expect(resolve('/questions')).toEqual({ id: 'questions', params: {} })
     expect(resolve('/settings').id).toBe('settings')
     expect(resolve('/dashboard').id).toBe('dashboard')
+    expect(resolve('/settings/billing')).toEqual({ id: 'settingsBilling', params: { tab: 'billing' } })
     expect(resolve('/history').id).toBe('history')
     expect(resolve('/history/q1')).toEqual({ id: 'questionHistory', params: { questionId: 'q1' } })
     expect(resolve('/takes/t1')).toEqual({ id: 'take', params: { takeId: 't1' } })

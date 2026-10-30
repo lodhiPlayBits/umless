@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { OutOfTimeBanner } from '@/features/billing'
 import { TakeRow } from '@/features/history'
 import type { Question } from '@/features/questions'
 import { daysBetween, nextQuestion, paceNote, practiceStreak, relativeDay, usageByQuestion, weekComparison, weeklyTrend } from '@/features/progress'
@@ -37,6 +38,8 @@ export default function Returning({ questions, takes, now }: ReturningProps) {
           Add question
         </ButtonLink>
       </div>
+
+      <OutOfTimeBanner showBuy />
 
       {next && (
         <section className="dashboard__next" aria-labelledby="next-title">

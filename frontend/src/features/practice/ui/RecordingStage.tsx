@@ -68,7 +68,8 @@ export default function RecordingStage({ startedAt, level, onStop, onCancel, max
         {hasMeter && !reducedMotion && (
           <div className="rec-meter meter" aria-hidden="true">
             {bars.map((value, index) => (
-              <i key={index} style={{ height: `${Math.max(8, Math.round(value * 100))}%` }} />
+              // Square root: normal speech (0.1-0.4) fills a third to two thirds of the bar, not a sliver.
+              <i key={index} style={{ height: `${Math.max(8, Math.round(Math.sqrt(value) * 100))}%` }} />
             ))}
           </div>
         )}

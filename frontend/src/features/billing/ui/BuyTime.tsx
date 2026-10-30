@@ -1,14 +1,7 @@
-import { useState } from 'react'
-import { ApiError } from '@/shared/api/client'
 import ChoiceDialog from '@/shared/ui/ChoiceDialog'
-import { formatPracticeTime, setAccount, useAccount } from '../model/account'
-import type { Pack } from '../api/billingApi'
-import { PaymentFailedError } from '../model/checkout'
+import { useAccount } from '../model/account'
 import { buyPack as realBuyPack } from '../model/purchase'
-
-function rupees(pack: Pack): string {
-  return `₹${pack.amount_paise / 100}`
-}
+import { packPrice, usePurchase } from '../model/usePurchase'
 
 interface BuyTimeProps {
   /** Called once: with a message after a payment, or null if the user backed out. */
@@ -19,33 +12,10 @@ interface BuyTimeProps {
 /** Pick a pack, then Razorpay Checkout takes over the screen until the payment is done. */
 export default function BuyTime({ onDone, buyPack = realBuyPack }: BuyTimeProps) {
   const { account } = useAccount()
-  const [paying, setPaying] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function buy(pack: Pack) {
-    setPaying(true)
-    setError(null)
-    try {
-      const result = await buyPack(pack.id)
-      if (result.status === 'paid') {
-        setAccount(result.account)
-        onDone(`Added ${formatPracticeTime(pack.seconds)} of practice time.`)
-        return
-      }
-    } catch (e) {
-      setError(
-        e instanceof PaymentFailedError
-          ? `${e.message}. You weren't charged; try again or use another method.`
-          : e instanceof ApiError && e.code === 'payment_invalid'
-            ? "Your payment couldn't be confirmed. If money left your account, it will be refunded by Razorpay."
-            : "The payment couldn't be completed. Try again in a moment.",
-      )
-    }
-    setPaying(false)
-  }
+  const purchase = usePurchase(buyPack)
 
   // Checkout is on screen; don't stack a dialog under it.
-  if (paying) return null
+  if (purchase.paying) return null
   const packs = account?.packs ?? []
   return (
     <ChoiceDialog
@@ -53,17 +23,20 @@ export default function BuyTime({ onDone, buyPack = realBuyPack }: BuyTimeProps)
       choices={[
         { label: 'Not now', onClick: () => onDone(null) },
         ...packs.map((pack, index) => ({
-          label: `${pack.label} · ${rupees(pack)}`,
+          label: `${pack.label} · ${packPrice(pack)}`,
           style: index === 0 ? ('primary' as const) : undefined,
-          onClick: () => void buy(pack),
+          onClick: () =>
+            void purchase.buy(pack).then((outcome) => {
+              if (outcome?.kind === 'paid') onDone(outcome.message)
+            }),
         })),
       ]}
     >
       <p>Each transcription uses up the length of your recording. Unused time never expires.</p>
       {packs.length === 0 && <p>Loading prices…</p>}
-      {error && (
+      {purchase.outcome?.kind === 'failed' && (
         <p className="ui-dialog__error" role="alert">
-          {error}
+          {purchase.outcome.message}
         </p>
       )}
     </ChoiceDialog>

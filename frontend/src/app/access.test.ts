@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { accessRedirect, layoutFor } from '@/app/access'
+import { accessRedirect, layoutFor, renderStatus } from '@/app/access'
+import { hasClerkSessionCookie } from '@/app/session/sessionCookie'
 import { NOT_FOUND, resolveRoute } from '@/app/routes'
 import { safeRedirect, signInPath } from '@/shared/config/paths'
 
@@ -69,5 +70,39 @@ describe('safeRedirect and signInPath', () => {
     expect(signInPath()).toBe('/sign-in')
     expect(signInPath('/dashboard')).toBe('/sign-in')
     expect(new URLSearchParams(signInPath('/practice/a b').split('?')[1]).get('redirect')).toBe('/practice/a b')
+  })
+})
+
+describe('renderStatus (paint the public site before Clerk has loaded)', () => {
+  const loading = (maybeSignedIn?: boolean) => ({ status: 'loading' as const, maybeSignedIn })
+
+  it('renders public and signed-out pages at once when no session cookie suggests a sign-in', () => {
+    expect(renderStatus(route('/'), loading(false))).toBe('signedOut')
+    expect(renderStatus(route('/pricing'), loading(false))).toBe('signedOut')
+    expect(renderStatus(route('/terms'), loading(false))).toBe('signedOut')
+  })
+
+  it('waits on app pages, and whenever the visitor may be signed in', () => {
+    expect(renderStatus(route('/dashboard'), loading(false))).toBe('loading')
+    expect(renderStatus(route('/'), loading(true))).toBe('loading')
+    expect(renderStatus(route('/'), loading(undefined))).toBe('loading')
+  })
+
+  it('uses the real status once loaded', () => {
+    expect(renderStatus(route('/'), { status: 'signedIn', maybeSignedIn: false })).toBe('signedIn')
+    expect(renderStatus(route('/dashboard'), { status: 'signedOut' })).toBe('signedOut')
+  })
+})
+
+describe('hasClerkSessionCookie', () => {
+  it.each([
+    ['', false],
+    ['__client_uat=0', false],
+    ['__client_uat_2GvgxsL_=0; __client_uat=0', false],
+    ['theme=dark; __client_uat=1761840000', true],
+    ['__client_uat_2GvgxsL_=1761840000', true],
+    ['not__client_uat=5', false],
+  ])('%j → %s', (cookie, expected) => {
+    expect(hasClerkSessionCookie(cookie)).toBe(expected)
   })
 })

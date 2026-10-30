@@ -1,2 +1,8 @@
 .settings-page { display: grid; gap: var(--space-5); }
-.settings-page h1, .settings-page p { margin: 0; }
+.settings-page h1 { margin: 0; font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em; }
+.settings-page p { margin: 0; }
+/* Clerk's profile, flattened into our panel. Its own stacking context: Clerk's z-indexes stay
+   inside it, so it can't cover the page's dialogs (Buy practice time) or toasts. */
+.settings-clerk { position: relative; z-index: 0; isolation: isolate; }
+.settings-clerk, .settings-clerk__card { width: 100%; max-width: none; box-shadow: none; }
+.settings-clerk__card { border: 1px solid var(--color-border); border-radius: var(--radius-md); }

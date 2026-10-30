@@ -1,5 +1,5 @@
 import { FREE_TRANSCRIPTIONS, PRICING } from '@/content/business'
-import { PATHS } from '@/shared/config/paths'
+import { HOME_PATH, PATHS } from '@/shared/config/paths'
 import { useSession } from '@/shared/lib/session'
 import { Badge, ButtonLink, cx } from '@/shared/ui'
 import './marketing.css'
@@ -47,7 +47,7 @@ export default function PricingCards() {
               ))}
             </ul>
             {signedIn ? (
-              <ButtonLink to={PATHS.settings} variant={plan.featured ? 'primary' : 'secondary'} block>
+              <ButtonLink to={plan.price === '₹0' ? HOME_PATH : PATHS.settingsBilling} variant={plan.featured ? 'primary' : 'secondary'} block>
                 {plan.price === '₹0' ? 'Open umless' : 'Buy time'}
               </ButtonLink>
             ) : (
