@@ -1,0 +1,7 @@
+.ui-toast-region { position: fixed; left: 50%; bottom: var(--space-6); transform: translateX(-50%); z-index: 45; width: max-content; max-width: calc(100vw - 2 * var(--space-4)); }
+.ui-toast {
+  display: flex; align-items: center; gap: var(--space-3); padding: 12px 16px; border-radius: var(--radius-md);
+  background: var(--color-text); color: var(--color-bg); box-shadow: var(--shadow-md); font-size: var(--text-sm); line-height: var(--leading-sm);
+}
+.ui-toast button { min-height: 40px; padding: 0 var(--space-2); background: none; border: 0; color: inherit; font: 600 var(--text-sm)/var(--leading-sm) var(--font-sans); text-decoration: underline; cursor: pointer; }
+.ui-toast button:focus-visible { outline-color: var(--color-bg); }

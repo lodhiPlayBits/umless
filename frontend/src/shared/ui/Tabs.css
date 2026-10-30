@@ -1,0 +1,4 @@
+.ui-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--color-border); overflow-x: auto; overflow-y: hidden; }
+.ui-tabs a { padding: 12px 14px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--color-text-muted); text-decoration: none; font-weight: 500; white-space: nowrap; }
+.ui-tabs a:hover { color: var(--color-text); }
+.ui-tabs a[aria-current="page"] { color: var(--color-text); border-bottom-color: var(--color-primary); }

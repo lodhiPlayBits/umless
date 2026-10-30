@@ -9,7 +9,7 @@ umless now runs on a public server (https://umless.in) with questions in MySQL. 
 ## Decisions
 
 **1. Clerk does sign-in; the backend only verifies its tokens.**
-- The frontend wraps the app in `ClerkProvider` (`src/SignInGate.tsx`). Signed out, it shows a welcome screen with Sign in / Create account (Clerk's modals). Signed in, it shows the app with Clerk's `UserButton` in the header.
+- The frontend wraps the app in `ClerkProvider` (`src/SignInGate.tsx`). Signed out, it shows a welcome screen with Sign in / Create account (Clerk's modals). Signed in, it shows the app with Clerk's `UserButton` in the header. *Since ADR 0005 phase 3: `src/app/session/ClerkSession.tsx`; signed-out visitors get the landing page, and app URLs redirect to `/sign-in`, which shows Clerk's `<SignIn>`.*
 - Every API request carries the Clerk session token as `Authorization: Bearer <token>`, added in one place: the `openapi-fetch` middleware in `src/client.ts`, fed by Clerk's standalone `getToken()` (which refreshes the short-lived token).
 - The backend (`app/auth.py`) verifies the token itself: RS256 signature against the instance's JWKS (`<issuer>/.well-known/jwks.json`, cached), `iss` equal to the instance's Frontend API URL (decoded from the publishable key), `exp`/`nbf` with 5 s leeway, and `azp` in `CLERK_AUTHORIZED_PARTIES`. The user id is `sub`. No Clerk secret key and no Clerk backend SDK are needed.
 

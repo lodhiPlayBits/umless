@@ -4,10 +4,15 @@
     <meta charset="UTF-8" />
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>umless</title>
+    <title>umless · Say less um</title>
+    <meta name="description" content="Practise interview answers out loud. umless shows every um, uh and long pause in your transcript, with your pace." />
+    <script>
+      // Apply the saved theme before first paint (src/shared/theme/theme.ts owns it after that).
+      try { var t = localStorage.getItem('umless-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t) } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/app/main.tsx"></script>
   </body>
 </html>

@@ -1,0 +1,14 @@
+.ui-banner { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-4); border-radius: var(--radius-md); border: 1px solid; color: var(--color-text); }
+.ui-banner__icon { margin-top: 2px; }
+.ui-banner__body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ui-banner__title { font-weight: 600; }
+.ui-banner__text { font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--color-text-muted); }
+.ui-banner__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.ui-banner--info { border-color: color-mix(in srgb, var(--color-primary) 40%, transparent); background: var(--primary-tint); }
+.ui-banner--info .ui-banner__icon { color: var(--color-primary); }
+.ui-banner--success { border-color: color-mix(in srgb, var(--color-success) 45%, transparent); background: var(--success-tint); }
+.ui-banner--success .ui-banner__icon { color: var(--color-success); }
+.ui-banner--warning { border-color: color-mix(in srgb, var(--color-warning) 45%, transparent); background: var(--warning-tint); }
+.ui-banner--warning .ui-banner__icon { color: var(--color-warning); }
+.ui-banner--danger { border-color: color-mix(in srgb, var(--color-danger) 45%, transparent); background: var(--danger-tint); }
+.ui-banner--danger .ui-banner__icon { color: var(--color-danger); }

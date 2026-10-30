@@ -1,0 +1,20 @@
+.ui-field { display: grid; gap: 6px; }
+.ui-field__label { font-size: var(--text-sm); line-height: var(--leading-sm); font-weight: 500; }
+.ui-field__hint { font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--color-text-muted); }
+.ui-field__error { display: flex; gap: 6px; align-items: center; font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--color-danger); }
+.ui-field__error .ui-icon { width: 16px; height: 16px; }
+.ui-input {
+  width: 100%; min-height: var(--touch-target); padding: 0 14px; font: inherit; font-size: var(--text-md);
+  background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+}
+.ui-input::placeholder { color: var(--color-text-muted); }
+.ui-input:focus { outline: 2px solid var(--color-primary); outline-offset: -1px; border-color: transparent; }
+.ui-input[aria-invalid="true"] { border-color: var(--color-danger); }
+.ui-input:disabled { opacity: 0.6; cursor: not-allowed; }
+.ui-textarea { padding: 12px 14px; min-height: 96px; resize: vertical; }
+.ui-select { position: relative; display: block; }
+.ui-select select { appearance: none; padding-right: 40px; cursor: pointer; }
+.ui-select::after {
+  content: ""; position: absolute; right: 16px; top: 50%; width: 8px; height: 8px; pointer-events: none;
+  border-right: 2px solid var(--color-text-muted); border-bottom: 2px solid var(--color-text-muted); transform: translateY(-70%) rotate(45deg);
+}

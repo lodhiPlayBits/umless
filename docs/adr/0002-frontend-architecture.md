@@ -1,6 +1,6 @@
 # ADR 0002: Frontend conventions for requests, errors and loading
 
-Status: accepted · Date: 2026-10-20 · Supersedes the frontend layout notes in ADR 0001
+Status: accepted · Date: 2026-10-20 · Supersedes the frontend layout notes in ADR 0001 · Decisions 6 and 7 replaced by ADR 0005
 
 ## Context
 

@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach } from 'vitest'
+import { queryClient } from '@/shared/api/query'
 
 // jsdom lacks these browser APIs; tests that care replace them with mocks.
 // Blob.text() reads jsdom's internal buffer directly: FileReader uses timers, which hang
@@ -15,5 +16,11 @@ if (!Blob.prototype.text) {
 }
 URL.createObjectURL ??= () => 'blob:jsdom'
 URL.revokeObjectURL ??= () => {}
+// jsdom logs "not implemented" for scrolling; the app scrolls on every page change.
+window.scrollTo = () => {}
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  // Tests reuse ids like q1: each starts with an empty cache.
+  queryClient.clear()
+})

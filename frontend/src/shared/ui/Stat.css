@@ -1,0 +1,8 @@
+.ui-stat { display: grid; gap: var(--space-1); align-content: start; padding: 20px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); min-width: 0; }
+.ui-stat__label { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--color-text-muted); }
+.ui-stat__value { font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ui-stat__value small { font-size: var(--text-sm); font-weight: 400; letter-spacing: 0; color: var(--color-text-muted); }
+.ui-stat__note { font-size: 13px; line-height: 18px; font-weight: 500; }
+.ui-stat__note--better { color: var(--color-success); }
+.ui-stat__note--worse { color: var(--color-warning); }
+.ui-stat__note--neutral { color: var(--color-text-muted); }

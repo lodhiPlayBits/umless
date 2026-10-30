@@ -13,7 +13,7 @@ const addButton = (page: Page) => page.getByRole('button', { name: /^Add/ })
 const rowTexts = (page: Page) => page.locator('.q-row .text')
 
 test('F1.1 first visit shows the intro and a focused New question field', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   await expect(page.getByText('Add the questions you want to practise', { exact: false })).toBeVisible()
   await expect(page.getByText('No questions yet.')).toBeVisible()
   await expect(newQuestion(page)).toBeEnabled()
@@ -21,7 +21,7 @@ test('F1.1 first visit shows the intro and a focused New question field', async 
 })
 
 test('F1.2 creating the first question appends it and clears the field', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   await newQuestion(page).fill('Tell me about yourself')
   await addButton(page).click()
 
@@ -35,14 +35,14 @@ test('F1.2 creating the first question appends it and clears the field', async (
 })
 
 test('F1.2 pressing Enter adds the question', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   await newQuestion(page).fill('Why this job?')
   await newQuestion(page).press('Enter')
   await expect(rowTexts(page)).toHaveText(['Why this job?'])
 })
 
 test('F1.3 adding several questions grows the list, newest at the bottom, with a count', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   for (const text of ['First question', 'Second question', 'Third question']) {
     await newQuestion(page).fill(text)
     await addButton(page).click()
@@ -56,7 +56,7 @@ test('F1.3 adding several questions grows the list, newest at the bottom, with a
 })
 
 test('F1.4 a blank field keeps Add disabled and shows no error', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   await expect(addButton(page)).toBeDisabled()
 
   await newQuestion(page).fill('   ')
@@ -69,7 +69,7 @@ test('F1.4 a blank field keeps Add disabled and shows no error', async ({ page }
 })
 
 test('F1.5 a question over 500 characters shows an inline error and Add is disabled', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   await newQuestion(page).fill('a'.repeat(512))
   await expect(page.getByText(/Keep questions under 500 characters/)).toBeVisible()
   await expect(page.getByText(/512/)).toBeVisible()
@@ -85,7 +85,7 @@ test('F1.5 a question over 500 characters shows an inline error and Add is disab
 })
 
 test('F1.5 a live character counter appears from 450 characters', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   await newQuestion(page).fill('a'.repeat(449))
   await expect(page.getByText('449 / 500')).toHaveCount(0)
   await newQuestion(page).fill('a'.repeat(450))
@@ -94,7 +94,7 @@ test('F1.5 a live character counter appears from 450 characters', async ({ page 
 
 test('F1.6 a duplicate (case and space insensitive) warns and offers Add anyway', async ({ page, request }) => {
   await seedQuestions(request, ['Tell me about yourself'])
-  await page.goto('/')
+  await page.goto('/questions')
   await newQuestion(page).fill('  TELL me   about yourself ')
 
   await expect(page.getByText('You already have this question')).toBeVisible()
@@ -109,7 +109,7 @@ test('F1.6 a duplicate (case and space insensitive) warns and offers Add anyway'
 })
 
 test('F1.7 save failure (server unreachable) shows an error, keeps the text, and allows retry', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   let down = true
   await page.route('**/api/questions', (route) => {
     if (route.request().method() === 'POST' && down) return route.abort('connectionrefused')
@@ -119,7 +119,7 @@ test('F1.7 save failure (server unreachable) shows an error, keeps the text, and
   await newQuestion(page).fill('What would your last manager say about you?')
   await addButton(page).click()
 
-  await expect(page.getByText(/Couldn't save\. Check that the backend is running/)).toBeVisible()
+  await expect(page.getByText(/Couldn't save\. Check your connection/)).toBeVisible()
   await expect(newQuestion(page)).toHaveValue('What would your last manager say about you?')
   await expect(addButton(page)).toBeEnabled()
   await expect(page.locator('.q-row')).toHaveCount(0)
@@ -132,14 +132,14 @@ test('F1.7 save failure (server unreachable) shows an error, keeps the text, and
 })
 
 test('F1.7 a 5xx response is also reported as a save failure', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/questions')
   await page.route('**/api/questions', (route) =>
     route.request().method() === 'POST' ? route.fulfill({ status: 502, body: 'Bad Gateway' }) : route.fallback(),
   )
   await newQuestion(page).fill('Some question')
   await addButton(page).click()
 
-  await expect(page.getByText(/Couldn't save\. Check that the backend is running/)).toBeVisible()
+  await expect(page.getByText(/Couldn't save\. Check your connection/)).toBeVisible()
   await expect(newQuestion(page)).toHaveValue('Some question')
   await expect(addButton(page)).toBeEnabled()
 })
@@ -150,10 +150,10 @@ test('F1 Error: unreachable server shows the error screen, a disabled field, and
   await page.route('**/api/questions', (route) =>
     down && route.request().method() === 'GET' ? route.abort('connectionrefused') : route.fallback(),
   )
-  await page.goto('/')
+  await page.goto('/questions')
 
   await expect(page.getByText("Can't reach the umless server")).toBeVisible()
-  await expect(page.getByText('python run.py')).toBeVisible()
+  await expect(page.getByText(/Your questions are safe/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
   await expect(newQuestion(page)).toBeDisabled()
 
@@ -166,7 +166,7 @@ test('F1 Error: unreachable server shows the error screen, a disabled field, and
 
 test('F1 Error: a 5xx on load also shows the error screen', async ({ page }) => {
   await page.route('**/api/questions', (route) => route.fulfill({ status: 503, body: 'Service Unavailable' }))
-  await page.goto('/')
+  await page.goto('/questions')
   await expect(page.getByText("Can't reach the umless server")).toBeVisible()
   await expect(newQuestion(page)).toBeDisabled()
 })

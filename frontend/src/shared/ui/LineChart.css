@@ -1,0 +1,6 @@
+.ui-chart { width: 100%; height: auto; display: block; }
+.ui-chart__grid { stroke: var(--color-border); stroke-width: 1; }
+.ui-chart__line { fill: none; stroke: var(--color-primary); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.ui-chart__area { fill: color-mix(in srgb, var(--color-primary) 12%, transparent); stroke: none; }
+.ui-chart__point { fill: var(--color-bg); stroke: var(--color-primary); stroke-width: 2; }
+.ui-chart text { fill: var(--color-text-muted); font: 500 12px var(--font-sans); }

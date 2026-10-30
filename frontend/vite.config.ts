@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', 'UMLESS_')
   return {
     plugins: [react()],
+    // '@/…' is src/ (docs/adr/0005-frontend-v2-architecture.md); tsconfig.app.json has the same alias.
+    resolve: { alias: [{ find: /^@\//, replacement: '/src/' }] },
     server: {
       // The app is same-origin; Vite's default CORS would let other localhost pages call /api.
       cors: false,

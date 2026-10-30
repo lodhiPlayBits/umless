@@ -1,0 +1,17 @@
+@import '../shared/theme/index.css';
+
+/* Base element styles. Components bring their own CSS (src/shared/ui, each feature's ui/). */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--color-bg); color: var(--color-text); font: var(--text-md)/var(--leading-md) var(--font-sans); }
+a { color: var(--color-primary); }
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+h1 { font-size: var(--text-xl); line-height: var(--leading-xl); }
+code { font-family: var(--font-mono); font-size: var(--text-sm); background: var(--color-surface); padding: 1px 6px; border-radius: var(--radius-sm); }
+
+/* Text utilities still used by a few pages. */
+.muted { color: var(--color-text-muted); }
+.small { font-size: var(--text-sm); line-height: var(--leading-sm); }
+
+/* Shown while Clerk loads, and a crash with nothing else on screen. */
+.loading-auth { text-align: center; padding: var(--space-7) var(--space-4); }
+.app-crash { max-width: var(--content-width); margin: var(--space-7) auto; padding: 0 var(--space-4); }

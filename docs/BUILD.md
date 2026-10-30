@@ -53,4 +53,5 @@ Row status values (endpoint groups, frontend screens): not-started, in-progress,
 
 ## Decisions log
 <!-- One line per decision that changed the plan: date, decision, why. -->
+- 2026-10-28: Frontend v2 build approved (ADR 0005, `docs/roadmap/2026-10-28-frontend-v2-build.md`): layered `app/pages/features/shared/content` folders, route table, TanStack Query, Clerk components for auth, live pack pricing kept. Contract change approved for Phase 7: `GET /api/takes` (all takes across questions, for History and the Dashboard).
 - 2026-10-20: New build cycle for v1.1 (attempt history) after the v1.0.0 release; v1.0.0 BUILD.md archived in docs/builds/. Order agreed: history (database) before auth, which waits until the app is deployed or multi-user.

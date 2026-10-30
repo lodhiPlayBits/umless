@@ -1,0 +1,2 @@
+.settings-page { display: grid; gap: var(--space-5); }
+.settings-page h1, .settings-page p { margin: 0; }

@@ -1,0 +1,82 @@
+/* Practice and result (docs/design/v2/app-practice.html, assets/app.css "Practice"). Tokens only. */
+
+.practice { width: 100%; display: grid; gap: var(--space-5); }
+.practice-head { display: grid; gap: var(--space-3); }
+.practice-head__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.practice-head__next { font-size: var(--text-sm); font-weight: 500; text-decoration: none; }
+.practice-question { margin: 0; font-size: clamp(24px, 4.5vw, 32px); line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.practice-lead, .practice-note { margin: 0; color: var(--color-text-muted); }
+.practice-note { font-size: var(--text-sm); line-height: var(--leading-sm); display: flex; gap: var(--space-2); align-items: flex-start; }
+.practice-note .ui-icon { width: 16px; height: 16px; margin-top: 2px; }
+
+/* The grey stage that holds the record button, timer and spinners. */
+.practice-stage { display: grid; justify-items: center; gap: var(--space-4); text-align: center; padding: var(--space-7) var(--space-5); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.practice-stage p { margin: 0; }
+.practice-stage__hint { font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--color-text-muted); }
+
+.record-button {
+  width: 88px; height: 88px; border: 0; border-radius: var(--radius-full); cursor: pointer; display: grid; place-items: center;
+  background: var(--color-record); color: var(--color-on-record);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-record) 18%, transparent);
+  transition: transform var(--duration-fast);
+}
+.record-button:hover { transform: scale(1.04); }
+.record-button__dot { width: 28px; height: 28px; border-radius: 50%; background: currentColor; }
+.record-button--stop .record-button__dot { border-radius: 6px; }
+.record-label { font-weight: 600; }
+
+.rec-live { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--color-record); }
+.rec-live::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--color-record); animation: rec-pulse 1.4s ease-in-out infinite; }
+.rec-live--static::before { animation: none; }
+@keyframes rec-pulse { 50% { opacity: 0.35; } }
+.rec-timer { font: 600 var(--text-timer)/var(--leading-timer) var(--font-mono); font-variant-numeric: tabular-nums; }
+.rec-timer--warning { color: var(--color-warning); }
+@media (max-width: 599px) { .rec-timer--warning { font-size: var(--text-2xl); line-height: var(--leading-2xl); } }
+.rec-meter { display: flex; align-items: flex-end; gap: 3px; height: 32px; }
+.rec-meter i { width: 4px; border-radius: 2px; background: var(--color-primary); transition: height var(--duration-fast); }
+
+.player { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-3) var(--space-4); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.player audio { flex: 1 1 220px; min-width: 0; height: 40px; }
+.player__time { font: 500 13px/18px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
+
+/* Primary actions under a take; they stick above the tab bar on phones (E21). */
+.action-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center; }
+.action-bar--split { justify-content: space-between; }
+@media (max-width: 640px) {
+  .action-bar { position: sticky; bottom: 0; z-index: 5; padding: var(--space-3) 0; background: var(--color-bg); border-top: 1px solid var(--color-border); }
+  .shell-content .action-bar { bottom: 64px; }
+  .action-bar .ui-button { flex: 1; }
+}
+
+/* Result */
+.result-stats { margin: 0; }
+.result-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--text-xs); line-height: var(--leading-xs); color: var(--color-text-muted); }
+.result-transcript { font-size: 18px; line-height: 32px; max-height: 60vh; overflow-y: auto; overflow-wrap: anywhere; }
+.result-transcript:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: var(--radius-sm); }
+.result-downloads { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+
+/* Past takes */
+.past-takes { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.past-takes h2 { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.past-takes p { margin: 0; }
+.take-body { display: grid; gap: var(--space-3); padding: 0 var(--space-5) var(--space-4); }
+
+/* Two columns on wide screens: the summary stays in view beside a long transcript (E13). */
+.shell-content:has(.result-view) { max-width: var(--app-width); }
+.result-view { display: grid; gap: var(--space-5); }
+.result-grid { display: grid; gap: var(--space-5); align-items: start; }
+@media (min-width: 900px) { .result-grid { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); } }
+.result-summary h2 { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+/* The summary as label/value rows: compact enough to sit beside the transcript. */
+.result-summary .result-stats { display: grid; gap: 0; grid-template-columns: none; }
+.result-stats .ui-stat { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); padding: var(--space-3) 0; border: 0; border-radius: 0; background: none; }
+.result-stats .ui-stat + .ui-stat { border-top: 1px solid var(--color-border); }
+.result-stats dd { margin: 0; text-align: right; }
+.result-stats .ui-stat__label { font-size: var(--text-sm); }
+.result-stats .ui-stat__value { font-size: var(--text-md); line-height: var(--leading-md); font-weight: 600; letter-spacing: 0; }
+.result-downloads { display: grid; }
+.past-takes .ui-row { min-height: 64px; }
+.take-body { justify-items: start; }
+.take-body .transcript { justify-self: stretch; }
+.mic-steps { margin: var(--space-2) 0 0; padding-left: var(--space-5); display: grid; gap: var(--space-1); }

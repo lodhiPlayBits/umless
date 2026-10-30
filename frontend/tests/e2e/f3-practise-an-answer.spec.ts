@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { resetQuestions, seedQuestions } from './helpers'
+import { TRANSCRIPTIONS, resetQuestions, seedQuestions } from './helpers'
 
 // docs/design/flows.md, F3: Practising an answer (steps 1-8) and edge cases E1-E3, E8-E11, E15, E16.
 
@@ -39,7 +39,7 @@ async function recordAndStop(page: Page) {
 }
 
 function failTranscription(page: Page, status: number, body: { code: string; detail: string }) {
-  return page.route('**/api/transcriptions', (route) =>
+  return page.route(TRANSCRIPTIONS, (route) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) }),
   )
 }
@@ -212,7 +212,7 @@ test('F3.7 while transcribing a spinner and the wait text show, the player stays
 }) => {
   let release!: () => void
   const gate = new Promise<void>((resolve) => (release = resolve))
-  await page.route('**/api/transcriptions', async (route) => {
+  await page.route(TRANSCRIPTIONS, async (route) => {
     await gate
     await route.continue()
   })
@@ -231,7 +231,7 @@ test('F3.7 while transcribing a spinner and the wait text show, the player stays
 
 test('F3.7 a second click on Transcribe is ignored: only one request is sent', async ({ page, request }) => {
   let calls = 0
-  await page.route('**/api/transcriptions', async (route) => {
+  await page.route(TRANSCRIPTIONS, async (route) => {
     calls += 1
     await new Promise((r) => setTimeout(r, 800))
     await route.continue()
@@ -300,11 +300,11 @@ test('E3 a browser that cannot record sees the unsupported message with a way ba
   await expect(page.getByText(/browser can't record audio/)).toBeVisible()
   await expect(startButton(page)).toHaveCount(0)
   await page.getByRole('link', { name: 'Back to questions', exact: true }).click()
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/questions$/)
 })
 
 test('E8 when the server cannot be reached the error is shown and the recording is kept', async ({ page, request }) => {
-  await page.route('**/api/transcriptions', (route) => route.abort())
+  await page.route(TRANSCRIPTIONS, (route) => route.abort())
   await openPractice(page, request)
   await recordAndStop(page)
   await transcribeButton(page).click()
@@ -316,7 +316,7 @@ test('E8 when the server cannot be reached the error is shown and the recording 
 })
 
 test('E8 Try again after an unreachable server transcribes the kept recording', async ({ page, request }) => {
-  await page.route('**/api/transcriptions', (route) => route.abort(), { times: 1 })
+  await page.route(TRANSCRIPTIONS, (route) => route.abort(), { times: 1 })
   await openPractice(page, request)
   await recordAndStop(page)
   await transcribeButton(page).click()
@@ -341,7 +341,7 @@ test('E9 a Deepgram failure (502) says transcription failed, keeps the recording
   await expect(tryAgainButton(page)).toBeVisible()
 })
 
-test('E10 a missing Deepgram key (503) points to DEEPGRAM_API_KEY, keeps the recording and offers Download audio', async ({
+test('E10 transcription unavailable (503) says so, keeps the recording and offers Download audio', async ({
   page,
   request,
 }) => {
@@ -350,8 +350,8 @@ test('E10 a missing Deepgram key (503) points to DEEPGRAM_API_KEY, keeps the rec
   await recordAndStop(page)
   await transcribeButton(page).click()
 
-  await expect(page.getByText("Transcription isn't set up")).toBeVisible()
-  await expect(page.getByText(/DEEPGRAM_API_KEY/)).toBeVisible()
+  await expect(page.getByText('Transcription is unavailable')).toBeVisible()
+  await expect(page.getByText(/Your recording is safe: try again later/)).toBeVisible()
   await expect(page.locator('audio')).toBeVisible()
   await expect(downloadAudio(page)).toBeVisible()
 })
@@ -407,7 +407,7 @@ test('E15 Discard from the leave dialog leaves for the questions list', async ({
   await page.getByRole('link', { name: /Questions/ }).first().click()
   await dialog(page).getByRole('button', { name: 'Discard' }).click()
 
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/questions$/)
   await expect(page.locator('.q-row .text')).toHaveText([QUESTION])
 })
 
@@ -416,7 +416,7 @@ test('E16 an unknown question id shows "That question doesn\'t exist any more" w
 
   await expect(page.getByText("That question doesn't exist any more")).toBeVisible()
   await page.getByRole('link', { name: 'Back to questions', exact: true }).click()
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/questions$/)
 })
 
 test('E16 a deleted question id shows the not-found message', async ({ page, request }) => {
@@ -432,7 +432,7 @@ test('F3.7 Transcribe uploads the recorded audio as the raw request body', async
   await resetQuestions(request)
   const [question] = await seedQuestions(request, ['Tell me about yourself.'])
   let upload: { contentType?: string; size: number; head: string } | undefined
-  await page.route('**/api/transcriptions', async (route) => {
+  await page.route(TRANSCRIPTIONS, async (route) => {
     const body = route.request().postDataBuffer()
     upload = {
       contentType: route.request().headers()['content-type'],

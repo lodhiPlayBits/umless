@@ -1,0 +1,11 @@
+.site-foot { border-top: 1px solid var(--color-border); }
+.site-foot__inner { width: 100%; max-width: calc(var(--marketing-width) + 2 * var(--space-6)); margin-inline: auto; padding: var(--space-7) var(--space-4); }
+@media (min-width: 768px) { .site-foot__inner { padding-inline: var(--space-6); } }
+.site-foot__grid { display: grid; gap: var(--space-6); grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.site-foot__brand { display: grid; gap: var(--space-3); align-content: start; }
+.site-foot__brand p, .site-foot__bottom { font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--color-text-muted); margin: 0; }
+.site-foot h2 { font-size: var(--text-sm); line-height: var(--leading-sm); font-weight: 600; margin: 0 0 var(--space-3); }
+.site-foot ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.site-foot nav a, .site-foot__bottom a { color: var(--color-text-muted); text-decoration: none; font-size: var(--text-sm); }
+.site-foot nav a:hover, .site-foot__bottom a:hover { color: var(--color-text); }
+.site-foot__bottom { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--color-border); display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); }

@@ -16,3 +16,9 @@ export async function seedQuestions(request: APIRequestContext, texts: string[])
   }
   return created
 }
+
+/**
+ * POST /api/transcriptions, with or without the ?questionId= the practice page adds to save the
+ * take. A '**\/api/transcriptions' glob misses the query string, so mocks wouldn't apply.
+ */
+export const TRANSCRIPTIONS = /\/api\/transcriptions(\?|$)/

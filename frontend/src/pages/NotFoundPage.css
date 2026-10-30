@@ -1,0 +1,3 @@
+.not-found { display: grid; justify-items: center; padding-top: var(--space-7); }
+.not-found__code { margin: 0 0 calc(-1 * var(--space-7)); font-size: clamp(64px, 14vw, 120px); line-height: 1; font-weight: 700; letter-spacing: -0.04em; }
+.not-found__code mark.filler { padding: 0 0.08em; border-radius: var(--radius-md); }
