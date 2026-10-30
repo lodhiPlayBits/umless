@@ -410,3 +410,17 @@ describe('QuestionsScreen and the shared questions cache', () => {
   })
 })
 
+describe('how often each question was practised', () => {
+  it('shows "Practised N×" with the latest rate, and "New" for questions never practised', async () => {
+    const takesApi = await import('@/features/takes/api/takesApi')
+    const spy = vi.spyOn(takesApi, 'listAllTakes').mockResolvedValue([
+      { id: 't2', question_id: 'a', created_at: new Date().toISOString(), duration_seconds: 60, summary: { word_count: 1, filler_count: 0, fillers: [], words_per_minute: 140, fillers_per_minute: 1.4, pause_count: 0, longest_pause_seconds: null } },
+      { id: 't1', question_id: 'a', created_at: new Date(Date.now() - 86_400_000 * 3).toISOString(), duration_seconds: 60, summary: { word_count: 1, filler_count: 0, fillers: [], words_per_minute: 140, fillers_per_minute: 2.0, pause_count: 0, longest_pause_seconds: null } },
+    ])
+    await renderScreen()
+    expect(await screen.findByText('Practised 2× · last today · 1.4 fillers/min')).toBeInTheDocument()
+    expect(screen.getAllByText('Not practised yet')).toHaveLength(2)
+    spy.mockRestore()
+  })
+})
+

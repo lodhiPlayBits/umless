@@ -17,17 +17,18 @@ describe('accessRedirect', () => {
   })
 
   it('does not add a redirect back to home', () => {
-    expect(accessRedirect(route('/questions'), 'signedOut', '/questions', null)).toBe('/sign-in')
+    expect(accessRedirect(route('/dashboard'), 'signedOut', '/dashboard', null)).toBe('/sign-in')
+    expect(accessRedirect(route('/questions'), 'signedOut', '/questions', null)).toBe('/sign-in?redirect=%2Fquestions')
   })
 
   it('sends a signed-in user from the landing or sign-in page into the app', () => {
-    expect(accessRedirect(route('/'), 'signedIn', '/', null)).toBe('/questions')
-    expect(accessRedirect(route('/sign-in'), 'signedIn', '/sign-in', null)).toBe('/questions')
+    expect(accessRedirect(route('/'), 'signedIn', '/', null)).toBe('/dashboard')
+    expect(accessRedirect(route('/sign-in'), 'signedIn', '/sign-in', null)).toBe('/dashboard')
   })
 
   it('honours a safe ?redirect= after signing in, and ignores an unsafe one', () => {
     expect(accessRedirect(route('/sign-in'), 'signedIn', '/sign-in?redirect=%2Fsettings', '/settings')).toBe('/settings')
-    expect(accessRedirect(route('/sign-in'), 'signedIn', '/sign-in', '//evil.example')).toBe('/questions')
+    expect(accessRedirect(route('/sign-in'), 'signedIn', '/sign-in', '//evil.example')).toBe('/dashboard')
   })
 
   it('shows public pages to everyone, and app pages to signed-in users', () => {
@@ -66,7 +67,7 @@ describe('safeRedirect and signInPath', () => {
 
   it('signInPath round-trips a return path', () => {
     expect(signInPath()).toBe('/sign-in')
-    expect(signInPath('/questions')).toBe('/sign-in')
+    expect(signInPath('/dashboard')).toBe('/sign-in')
     expect(new URLSearchParams(signInPath('/practice/a b').split('?')[1]).get('redirect')).toBe('/practice/a b')
   })
 })

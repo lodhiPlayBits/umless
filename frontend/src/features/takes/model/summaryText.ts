@@ -1,6 +1,6 @@
 import { transcriptText } from '@/shared/lib/filenames'
 import { formatClock } from '@/shared/lib/timeLabel'
-import type { Transcript } from '../api/practiceApi'
+import type { Transcript } from '../api/takesApi'
 
 type Word = Transcript['words'][number]
 

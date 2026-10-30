@@ -9,16 +9,28 @@ export const PATHS = {
   pricing: '/pricing',
   signIn: '/sign-in',
   signUp: '/sign-up',
+  dashboard: '/dashboard',
   questions: '/questions',
   practice: '/practice/:questionId',
+  history: '/history',
+  questionHistory: '/history/:questionId',
+  take: '/takes/:takeId',
   settings: '/settings',
 } as const
 
-/** Where a signed-in user lands: the questions list until the dashboard exists (roadmap phase 8). */
-export const HOME_PATH: string = PATHS.questions
+/** Where a signed-in user lands. */
+export const HOME_PATH: string = PATHS.dashboard
 
 export function practicePath(questionId: string): string {
   return buildPath(PATHS.practice, { questionId })
+}
+
+export function questionHistoryPath(questionId: string): string {
+  return buildPath(PATHS.questionHistory, { questionId })
+}
+
+export function takePath(takeId: string): string {
+  return buildPath(PATHS.take, { takeId })
 }
 
 /** The sign-in page, coming back to `returnTo` afterwards. */

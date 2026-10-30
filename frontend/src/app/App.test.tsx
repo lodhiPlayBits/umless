@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -55,11 +55,11 @@ describe('App layouts and nav', () => {
     expect(within(sidebar).getByRole('link', { name: 'Settings' })).not.toHaveAttribute('aria-current')
   })
 
-  it('without Clerk the local user is signed in: the landing page goes straight to the questions', async () => {
+  it('without Clerk the local user is signed in: the landing page goes straight to the dashboard', async () => {
     window.history.pushState(null, '', '/')
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Your questions' })).toBeInTheDocument()
-    expect(window.location.pathname).toBe('/questions')
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
+    expect(screen.getAllByRole('navigation', { name: 'App' })[0]).toContainElement(screen.getAllByRole('link', { name: 'Dashboard' })[0])
   })
 
   it('shows public pages in the marketing layout with the legal footer', async () => {

@@ -50,17 +50,9 @@
 
 /* Result */
 .result-stats { margin: 0; }
-.result-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--text-xs); line-height: var(--leading-xs); color: var(--color-text-muted); }
-.result-transcript { font-size: 18px; line-height: 32px; max-height: 60vh; overflow-y: auto; overflow-wrap: anywhere; }
-.result-transcript:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: var(--radius-sm); }
 .result-downloads { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 
-/* Past takes */
-.past-takes { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
-.past-takes h2 { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
-.past-takes p { margin: 0; }
-.take-body { display: grid; gap: var(--space-3); padding: 0 var(--space-5) var(--space-4); }
 
 /* Two columns on wide screens: the summary stays in view beside a long transcript (E13). */
 .shell-content:has(.result-view) { max-width: var(--app-width); }
@@ -76,7 +68,4 @@
 .result-stats .ui-stat__label { font-size: var(--text-sm); }
 .result-stats .ui-stat__value { font-size: var(--text-md); line-height: var(--leading-md); font-weight: 600; letter-spacing: 0; }
 .result-downloads { display: grid; }
-.past-takes .ui-row { min-height: 64px; }
-.take-body { justify-items: start; }
-.take-body .transcript { justify-self: stretch; }
 .mic-steps { margin: var(--space-2) 0 0; padding-left: var(--space-5); display: grid; gap: var(--space-1); }

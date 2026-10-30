@@ -3,6 +3,16 @@ import type { components } from '@/shared/api/generated/openapi'
 
 export type TakeSummary = components['schemas']['TakeSummary']
 export type Take = components['schemas']['Take']
+export type Transcript = components['schemas']['Transcript']
+
+/** Which takes to list across questions (docs/api/openapi.yaml listAllTakes). */
+export type TakeFilter = { questionId?: string; since?: string; limit?: number }
+
+/** Takes across all questions (or one question's), newest first. */
+export async function listAllTakes(filter: TakeFilter = {}, signal?: AbortSignal): Promise<TakeSummary[]> {
+  const body = await unwrap(client.GET('/api/takes', { params: { query: filter }, signal }))
+  return body.items
+}
 
 /** A question's saved takes (docs/api/openapi.yaml listTakes, getTake, deleteTake). */
 export interface TakesApi {

@@ -1,6 +1,6 @@
 import { Banner, Icon, Kbd } from '@/shared/ui'
-import type { TakesApi } from '../../api/takesApi'
-import PastTakes from '../PastTakes'
+import { PastTakes } from '@/features/takes'
+import type { TakesApi } from '@/features/takes'
 
 type ReadyStageProps = {
   questionId: string

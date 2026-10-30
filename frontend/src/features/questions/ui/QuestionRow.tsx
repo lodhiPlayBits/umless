@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Button, ButtonLink, Icon, IconButton } from '@/shared/ui'
+import { relativeDay } from '@/features/progress'
+import type { QuestionUsage } from '@/features/progress'
+import { Badge, Button, ButtonLink, Icon, IconButton } from '@/shared/ui'
 import { practicePath } from '@/shared/config/paths'
 import { saveErrorMessage } from '../api/questionsApi'
 import { MAX_QUESTION_LENGTH, checkQuestionText } from '../model/questionText'
@@ -18,10 +20,12 @@ interface QuestionRowProps {
   /** Saves the trimmed text; rejects with an ApiError when it can't. */
   onSave: (text: string) => Promise<void>
   onDelete: () => void
+  /** How often it was practised; null while unknown (not loaded, or failed), undefined = never. */
+  usage?: QuestionUsage | null
 }
 
 export default function QuestionRow(props: QuestionRowProps) {
-  const { question, number, editing, justSaved, onStartEdit, onDelete } = props
+  const { question, number, editing, justSaved, onStartEdit, onDelete, usage } = props
   const editButtonRef = useRef<HTMLButtonElement>(null)
   const wasEditing = useRef(editing)
 
@@ -40,6 +44,7 @@ export default function QuestionRow(props: QuestionRowProps) {
         <span className="ui-row__title text" title={question.text} onDoubleClick={onStartEdit}>
           {question.text}
         </span>
+        {usage !== null && <UsageLine usage={usage} />}
       </span>
       <span className="ui-row__end">
         {justSaved && (
@@ -49,12 +54,29 @@ export default function QuestionRow(props: QuestionRowProps) {
         )}
         <IconButton ref={editButtonRef} icon="edit" label={`Edit question ${number}`} onClick={onStartEdit} />
         <IconButton icon="trash" label={`Delete question ${number}`} onClick={onDelete} />
-        <ButtonLink to={practicePath(question.id)} variant="secondary" size="sm">
+        <ButtonLink to={practicePath(question.id)} variant={usage === undefined ? 'primary' : 'secondary'} size="sm">
           Practise<span className="ui-sr-only"> question {number}</span>
         </ButtonLink>
       </span>
     </li>
   )
+}
+
+/** "Practised 3× · last today · 1.4 fillers/min", or "New · Not practised yet". */
+function UsageLine({ usage }: { usage: QuestionUsage | undefined }) {
+  if (!usage) {
+    return (
+      <span className="ui-row__meta">
+        <Badge tone="primary">New</Badge> Not practised yet
+      </span>
+    )
+  }
+  const parts = [
+    usage.count === 1 ? 'Practised once' : `Practised ${usage.count}×`,
+    `last ${relativeDay(usage.lastAt, new Date())}`,
+    usage.latestFillersPerMinute === null ? null : `${usage.latestFillersPerMinute.toFixed(1)} fillers/min`,
+  ]
+  return <span className="ui-row__meta">{parts.filter(Boolean).join(' · ')}</span>
 }
 
 function EditingRow({ question, number, questions, onCancelEdit, onSave }: QuestionRowProps) {

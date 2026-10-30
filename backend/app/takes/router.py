@@ -1,10 +1,11 @@
 import logging
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.auth import get_user_id
 from app.errors import ApiError
+from app.http import parse_date_time
 from app.questions.repository import QuestionRepository
 from app.questions.router import get_question_repository, question_not_found
 from app.takes.domain import Take
@@ -41,6 +42,18 @@ def list_takes(
     if questions.get(question_id) is None:
         raise question_not_found()
     return {"items": [take_summary(take) for take in history.list(question_id)]}
+
+
+@router.get("/takes")
+def list_all_takes(
+    question_id: str | None = Query(None, alias="questionId", min_length=1, max_length=64),
+    since: str | None = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+    history: TakeHistory = Depends(get_take_history),
+) -> dict:
+    after = parse_date_time(since, "since") if since is not None else None
+    # A filter, not a lookup: an unknown question matches nothing rather than being a 404.
+    return {"items": [take_summary(take) for take in history.recent(question_id, after, limit)]}
 
 
 @router.get("/takes/{take_id}")

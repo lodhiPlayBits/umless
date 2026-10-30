@@ -41,9 +41,13 @@ const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const PricingPage = lazy(() => import('@/pages/PricingPage'))
 const SignInPage = lazy(() => import('@/pages/SignInPage'))
 const SignUpPage = lazy(() => import('@/pages/SignUpPage'))
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const QuestionsPage = lazy(() => import('@/pages/QuestionsPage'))
 const PracticePage = lazy(() => import('@/pages/PracticePage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const HistoryPage = lazy(() => import('@/pages/HistoryPage'))
+const QuestionHistoryPage = lazy(() => import('@/pages/QuestionHistoryPage'))
+const TakePage = lazy(() => import('@/pages/TakePage'))
 const LegalDocumentPage = lazy(() => import('@/pages/LegalDocumentPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 
@@ -74,6 +78,16 @@ export const ROUTES: readonly RouteDef[] = [
   { id: 'signIn', pattern: PATHS.signIn, access: 'signedOut', layout: 'auth', title: 'Log in', page: SignInPage },
   { id: 'signUp', pattern: PATHS.signUp, access: 'signedOut', layout: 'auth', title: 'Create your account', page: SignUpPage },
   {
+    id: 'dashboard',
+    pattern: PATHS.dashboard,
+    access: 'signedIn',
+    layout: 'app',
+    title: 'Dashboard',
+    page: DashboardPage,
+    nav: { label: 'Dashboard', icon: 'home', order: 10 },
+    width: 'wide',
+  },
+  {
     id: 'questions',
     pattern: PATHS.questions,
     access: 'signedIn',
@@ -83,6 +97,27 @@ export const ROUTES: readonly RouteDef[] = [
     nav: { label: 'Questions', icon: 'list', order: 20 },
   },
   { id: 'practice', pattern: PATHS.practice, access: 'signedIn', layout: 'app', title: 'Practice', page: PracticePage, parent: 'questions' },
+  {
+    id: 'history',
+    pattern: PATHS.history,
+    access: 'signedIn',
+    layout: 'app',
+    title: 'History',
+    page: HistoryPage,
+    nav: { label: 'History', icon: 'history', order: 30 },
+    width: 'wide',
+  },
+  {
+    id: 'questionHistory',
+    pattern: PATHS.questionHistory,
+    access: 'signedIn',
+    layout: 'app',
+    title: 'Progress',
+    page: QuestionHistoryPage,
+    parent: 'history',
+    width: 'wide',
+  },
+  { id: 'take', pattern: PATHS.take, access: 'signedIn', layout: 'app', title: 'Take', page: TakePage, parent: 'history', width: 'wide' },
   {
     id: 'settings',
     pattern: PATHS.settings,

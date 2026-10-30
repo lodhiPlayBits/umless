@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { queryClient, withTimeout } from '@/shared/api/query'
-import { listQuestions } from '../api/questionsApi'
+import { createQuestion, listQuestions } from '../api/questionsApi'
 import type { Question } from './questionText'
 
 export const QUESTIONS_KEY = ['questions'] as const
@@ -18,4 +18,18 @@ export function updateCachedQuestions(update: (questions: Question[]) => Questio
 /** Something changed the list elsewhere (a question was deleted in another tab): load it again. */
 export function invalidateQuestions() {
   return queryClient.invalidateQueries({ queryKey: QUESTIONS_KEY })
+}
+
+/** Starter questions offered on an empty list. */
+export const SUGGESTED_QUESTIONS = [
+  'Tell me about yourself.',
+  "What's your biggest weakness?",
+  'Explain your last project in two minutes.',
+] as const
+
+/** Save a new question at the end of the list (or at `position`) and show it on every screen. */
+export async function addQuestion(text: string): Promise<Question> {
+  const created = await createQuestion(text)
+  updateCachedQuestions((questions) => [...questions, created])
+  return created
 }

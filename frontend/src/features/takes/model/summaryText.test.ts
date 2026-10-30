@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Transcript } from '../api/practiceApi'
+import type { Transcript } from '../api/takesApi'
 import { summaryLine, summaryRows, transcriptFile, transcriptSegments } from './summaryText'
 
 type Word = Transcript['words'][number]

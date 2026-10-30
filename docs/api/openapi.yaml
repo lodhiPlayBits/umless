@@ -348,6 +348,61 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/takes:
+    get:
+      operationId: listAllTakes
+      tags: [takes]
+      summary: List saved takes across all questions, newest first
+      description: >-
+        The signed-in user's takes, optionally for one question and since a time, newest first and
+        at most `limit`. An unknown questionId is a filter that matches nothing (an empty list),
+        not a 404.
+      x-screen:
+        - history / all takes, one question's progress
+        - dashboard / stats, chart, recent takes
+      parameters:
+        - name: questionId
+          in: query
+          required: false
+          description: Only this question's takes.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+            example: 3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
+        - name: since
+          in: query
+          required: false
+          description: Only takes saved at or after this time.
+          schema:
+            type: string
+            format: date-time
+            example: '2026-10-01T00:00:00Z'
+        - name: limit
+          in: query
+          required: false
+          description: The most takes to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 200
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The takes, newest first; each without its transcript.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TakeList'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/takes/{takeId}:
     parameters:
       - $ref: '#/components/parameters/TakeId'

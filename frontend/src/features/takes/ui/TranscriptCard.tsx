@@ -1,6 +1,7 @@
 import { Fragment, useId } from 'react'
-import type { Transcript } from '../api/practiceApi'
+import type { Transcript } from '../api/takesApi'
 import { transcriptSegments } from '../model/summaryText'
+import './takes.css'
 
 /** The transcript with fillers highlighted and pauses as dots (docs/design/flows.md F4.2). */
 export default function TranscriptCard({ transcript }: { transcript: Transcript }) {

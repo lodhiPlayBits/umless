@@ -1,9 +1,9 @@
 import { UNREACHABLE_TITLE, classifyApiError } from '@/shared/api/apiErrors'
 import { ApiError, client, unwrap } from '@/shared/api/client'
-import type { components } from '@/shared/api/generated/openapi'
 import type { Question } from '@/features/questions'
+import type { Transcript } from '@/features/takes'
 
-export type Transcript = components['schemas']['Transcript']
+export type { Transcript }
 
 export interface PracticeQuestion {
   question: Question

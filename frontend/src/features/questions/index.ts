@@ -2,3 +2,5 @@
 export { default as QuestionsScreen } from './ui/QuestionsScreen'
 export { default as QuestionNotFound } from './ui/QuestionNotFound'
 export type { Question } from './model/questionText'
+export { useQuestions } from './model/useQuestions'
+export { default as QuickAddQuestion } from './ui/QuickAddQuestion'

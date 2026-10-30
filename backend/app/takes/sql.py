@@ -24,6 +24,7 @@ takes = Table(
     Column("duration_seconds", Float, nullable=True),
     Column("summary", JSON, nullable=False),
     Index("ix_takes_user_id_question_id_created_at", "user_id", "question_id", "created_at"),
+    Index("ix_takes_user_id_created_at", "user_id", "created_at"),
     mysql_charset="utf8mb4",
     mysql_collate="utf8mb4_bin",
 )
@@ -49,6 +50,16 @@ class SqlTakeRepository:
             .where(self._owned, takes.c.question_id == question_id)
             .order_by(takes.c.created_at.desc(), takes.c.id)
         )
+        with self._engine.connect() as conn:
+            return [_take(row) for row in conn.execute(query)]
+
+    def recent(self, question_id: str | None, since: datetime | None, limit: int) -> list[Take]:
+        query = select(takes).where(self._owned)
+        if question_id is not None:
+            query = query.where(takes.c.question_id == question_id)
+        if since is not None:
+            query = query.where(takes.c.created_at >= since)
+        query = query.order_by(takes.c.created_at.desc(), takes.c.id).limit(limit)
         with self._engine.connect() as conn:
             return [_take(row) for row in conn.execute(query)]
 

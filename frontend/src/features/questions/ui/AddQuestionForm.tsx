@@ -9,7 +9,7 @@ interface AddQuestionFormProps {
   questions: Question[]
   disabled?: boolean
   /** Saves the trimmed text; rejects with an ApiError when it can't. */
-  onAdd: (text: string) => Promise<void>
+  onAdd: (text: string) => Promise<unknown>
 }
 
 export default function AddQuestionForm({ questions, disabled = false, onAdd }: AddQuestionFormProps) {

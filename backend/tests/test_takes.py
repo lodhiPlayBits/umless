@@ -179,6 +179,70 @@ def test_a_failed_record_removes_the_transcript_it_just_wrote(client):
 # --- reading and deleting ----------------------------------------------------------------
 
 
+# --- all takes (History, Dashboard) --------------------------------------------------------
+
+
+def test_all_takes_are_listed_across_questions_newest_first(client, contract_schema):
+    first = add_question(client, "Tell me about yourself")
+    second = add_question(client, "Why this role?")
+    ids = [transcribe(client, question["id"]).json()["take_id"] for question in (first, second, first)]
+
+    response = client.get("/api/takes")
+    assert response.status_code == 200
+    validate(contract_schema, "listAllTakes", response)
+    items = response.json()["items"]
+    assert [t["id"] for t in items] == list(reversed(ids))
+    assert [t["question_id"] for t in items] == [first["id"], second["id"], first["id"]]
+
+
+def test_all_takes_can_be_filtered_by_question_and_limited(client, contract_schema):
+    first = add_question(client, "Tell me about yourself")
+    second = add_question(client, "Why this role?")
+    for question in (first, second, first, first):
+        transcribe(client, question["id"])
+
+    only_first = client.get("/api/takes", params={"questionId": first["id"]}).json()["items"]
+    assert len(only_first) == 3 and {t["question_id"] for t in only_first} == {first["id"]}
+    assert len(client.get("/api/takes", params={"limit": 2}).json()["items"]) == 2
+
+
+def test_an_unknown_question_filter_matches_nothing(client, contract_schema):
+    transcribe(client, add_question(client)["id"])
+    response = client.get("/api/takes", params={"questionId": MISSING_ID})
+    assert response.status_code == 200
+    assert response.json() == {"items": []}
+    validate(contract_schema, "listAllTakes", response)
+
+
+def test_since_keeps_only_newer_takes_and_understands_time_zones(client):
+    transcribe(client, add_question(client)["id"])
+    assert len(client.get("/api/takes", params={"since": "2000-01-01T00:00:00Z"}).json()["items"]) == 1
+    assert client.get("/api/takes", params={"since": "2999-01-01T00:00:00Z"}).json() == {"items": []}
+    # The same instant written with an offset.
+    assert client.get("/api/takes", params={"since": "2999-01-01T05:30:00+05:30"}).json() == {"items": []}
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"limit": 0},
+        {"limit": 1001},
+        {"limit": "x"},
+        {"since": "yesterday"},
+        {"since": "0.5"},  # pydantic would read this as a Unix timestamp
+        {"since": "2026-10-30"},  # a date, not a date-time
+        {"since": "2026-10-30T10:00:00"},  # no offset
+        {"since": "2026-02-30T10:00:00Z"},
+        {"questionId": ""},
+    ],
+)
+def test_invalid_filters_are_422(client, contract_schema, params):
+    response = client.get("/api/takes", params=params)
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+    validate(contract_schema, "listAllTakes", response)
+
+
 def test_listing_takes_of_an_unknown_question_is_404(client, contract_schema):
     response = client.get(f"/api/questions/{MISSING_ID}/takes")
 
@@ -260,6 +324,9 @@ def test_takes_need_sign_in_and_are_private(tmp_path):
 
         assert c.get(f"/api/takes/{take_id}").status_code == 401
         assert c.get(f"/api/questions/{question['id']}/takes").status_code == 401
+        assert c.get("/api/takes").status_code == 401
+        assert c.get("/api/takes", headers=bob).json() == {"items": []}
+        assert [t["id"] for t in c.get("/api/takes", headers=alice).json()["items"]] == [take_id]
         assert c.get(f"/api/takes/{take_id}", headers=bob).status_code == 404
         assert c.delete(f"/api/takes/{take_id}", headers=bob).status_code == 404
         assert c.get(f"/api/questions/{question['id']}/takes", headers=bob).json() == {"items": []}
@@ -301,6 +368,40 @@ def test_take_store_round_trip_order_and_isolation(take_store, tmp_path):
     assert bob.delete("a1") is False
     assert alice.delete("a1") is True
     assert alice.get("a1") is None
+
+
+def test_take_store_recent_filters_orders_and_limits(take_store, tmp_path):
+    from datetime import datetime
+
+    alice = take_store.for_user(f"{tmp_path}/alice")
+    bob = take_store.for_user(f"{tmp_path}/bob")
+    alice.add(take("r1", created_at="2026-10-20T10:00:00Z"))
+    alice.add(take("r2", question_id="q2", created_at="2026-10-25T10:00:00Z"))
+    alice.add(take("r3", created_at="2026-10-28T10:00:00Z"))
+    bob.add(take("rb1", created_at="2026-10-29T10:00:00Z"))
+
+    assert [t.id for t in alice.recent(None, None, 10)] == ["r3", "r2", "r1"]
+    assert [t.id for t in alice.recent("q1", None, 10)] == ["r3", "r1"]
+    assert [t.id for t in alice.recent(None, datetime(2026, 10, 25, 10), 10)] == ["r3", "r2"]
+    assert [t.id for t in alice.recent(None, None, 2)] == ["r3", "r2"]
+    assert alice.recent("nope", None, 10) == []
+    assert [t.id for t in bob.recent(None, None, 10)] == ["rb1"]
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("2026-10-01T00:00:00Z", "2026-10-01T00:00:00+00:00"),
+        ("2026-10-01t05:30:00z", "2026-10-01T05:30:00+00:00"),
+        ("2026-10-01T05:30:00+05:30", "2026-10-01T05:30:00+05:30"),
+        ("2026-10-01T05:30:00.250-01:00", "2026-10-01T05:30:00.250000-01:00"),
+        ("2016-12-31T23:59:60Z", "2016-12-31T23:59:59+00:00"),  # leap second
+    ],
+)
+def test_parse_date_time_accepts_rfc3339(value, expected):
+    from app.http import parse_date_time
+
+    assert parse_date_time(value, "since").isoformat() == expected
 
 
 # --- OCI bucket client -------------------------------------------------------------------

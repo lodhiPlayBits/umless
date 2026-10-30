@@ -14,6 +14,7 @@
   .ui-row__lead { display: none; }
   .ui-row__text { flex-basis: 100%; }
   .ui-row__end { width: 100%; justify-content: flex-end; }
+  .ui-row--link { flex-wrap: nowrap; }
   .ui-row--link .ui-row__text { flex-basis: auto; }
   .ui-row--link .ui-row__end { width: auto; }
 }
