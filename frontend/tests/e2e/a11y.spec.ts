@@ -33,6 +33,7 @@ const pages = () => [
   ['take', `/takes/${ids.take}`],
   ['settings', '/settings'],
   ['billing', '/settings/billing'],
+  ['purchases', '/purchases'],
   ['pricing', '/pricing'],
   ['terms', '/terms'],
   ['not found', '/no-such-page'],

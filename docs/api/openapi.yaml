@@ -471,6 +471,30 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/payments:
+    get:
+      operationId: listPurchases
+      tags: [billing]
+      summary: The signed-in user's purchases, newest first
+      description: >-
+        Paid orders only (a checkout that was opened and closed isn't a purchase). Empty on a
+        server without payments.
+      x-screen:
+        - settings-billing / purchases
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: Purchases, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseList'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/payments/orders:
     post:
       operationId: createPaymentOrder
@@ -1184,6 +1208,61 @@ components:
         pack_id:
           type: string
           enum: [session_1, session_5]
+
+    Purchase:
+      type: object
+      additionalProperties: false
+      required: [order_id, payment_id, pack_id, label, seconds, amount_paise, currency, paid_at]
+      properties:
+        order_id:
+          type: string
+          minLength: 1
+          description: Razorpay's order id.
+        payment_id:
+          type: string
+          minLength: 1
+          description: Razorpay's payment id, as on the receipt; quote it to ask for a refund.
+        pack_id:
+          type: string
+          minLength: 1
+        label:
+          type: string
+          minLength: 1
+        seconds:
+          type: integer
+          minimum: 1
+          description: Practice time it added.
+        amount_paise:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        paid_at:
+          type: string
+          format: date-time
+          description: When the payment was confirmed, UTC.
+      example:
+        order_id: order_Tu3l5LvVnBJXfu
+        payment_id: pay_Tu3lhmtObPkSdy
+        pack_id: session_1
+        label: 1 session · 60 minutes
+        seconds: 3600
+        amount_paise: 4000
+        currency: INR
+        paid_at: '2026-10-30T08:50:46Z'
+
+    PurchaseList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: Newest first.
+          items:
+            $ref: '#/components/schemas/Purchase'
 
     PaymentOrder:
       type: object

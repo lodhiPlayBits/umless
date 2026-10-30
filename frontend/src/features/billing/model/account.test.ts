@@ -22,8 +22,11 @@ describe('formatPracticeTime', () => {
 })
 
 describe('practiceTimeLabel', () => {
-  it('shows free transcriptions first, then paid time, then a prompt to buy', () => {
-    expect(practiceTimeLabel(account(3, 3600))).toBe('3 free left')
+  it('shows everything that is left: free transcriptions and paid time, or a prompt to buy', () => {
+    // Paid time must show even while free transcriptions remain: a purchase looked lost otherwise.
+    expect(practiceTimeLabel(account(3, 3600))).toBe('3 free + 1 h left')
+    expect(practiceTimeLabel(account(1, 5400))).toBe('1 free + 1 h 30 min left')
+    expect(practiceTimeLabel(account(3, 0))).toBe('3 free left')
     expect(practiceTimeLabel(account(0, 3600))).toBe('1 h left')
     expect(practiceTimeLabel(account(0, 0))).toBe('Buy practice time')
   })

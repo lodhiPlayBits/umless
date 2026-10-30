@@ -32,3 +32,8 @@ Every transcription is a paid Deepgram call, and umless is now public with sign-
 - Prices are code (`PACKS`); changing one is a deploy. Orders keep the amount and seconds they were bought at.
 - Refunds are done in the Razorpay dashboard and do not remove time automatically.
 - Going live means live keys (`rzp_live_…`) in `backend/.env`, a webhook in Razorpay's live mode, and Razorpay's website checks (terms, refund and contact pages) on umless.in.
+
+## Later additions
+
+- 2026-10-30: `GET /api/payments` lists a user's purchases (paid orders only, newest first, with the Razorpay payment id and `paid_at`). Settings → Billing shows them; the list reloads after each payment. A checkout opened and closed is an order with status `created` and is not listed.
+

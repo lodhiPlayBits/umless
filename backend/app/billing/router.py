@@ -82,6 +82,29 @@ def get_account(
     return account_body(billing.balance(user_id) if billing else None)
 
 
+def purchase_body(order: Order) -> dict:
+    pack = PACKS.get(order.pack_id)
+    return {
+        "order_id": order.id,
+        "payment_id": order.payment_id,
+        "pack_id": order.pack_id,
+        # The pack's current name; a pack retired later keeps its id as its name.
+        "label": pack.label if pack else order.pack_id,
+        "seconds": order.seconds,
+        "amount_paise": order.amount_paise,
+        "currency": pack.currency if pack else "INR",
+        "paid_at": order.paid_at,
+    }
+
+
+@router.get("/payments")
+def list_purchases(
+    user_id: str = Depends(get_user_id), billing: BillingStore | None = Depends(get_billing)
+) -> dict:
+    # A server without payments has nothing to list, like /api/account's "metered": false.
+    return {"items": [purchase_body(order) for order in billing.purchases(user_id)] if billing else []}
+
+
 @router.post("/payments/orders", status_code=201, dependencies=[Depends(require_json)])
 def create_order(
     body: OrderCreate,

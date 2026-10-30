@@ -196,6 +196,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in user's purchases, newest first
+         * @description Paid orders only (a checkout that was opened and closed isn't a purchase). Empty on a server without payments.
+         */
+        get: operations["listPurchases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/payments/orders": {
         parameters: {
             query?: never;
@@ -622,6 +642,39 @@ export interface components {
         PaymentOrderCreate: {
             /** @enum {string} */
             pack_id: "session_1" | "session_5";
+        };
+        /**
+         * @example {
+         *       "order_id": "order_Tu3l5LvVnBJXfu",
+         *       "payment_id": "pay_Tu3lhmtObPkSdy",
+         *       "pack_id": "session_1",
+         *       "label": "1 session · 60 minutes",
+         *       "seconds": 3600,
+         *       "amount_paise": 4000,
+         *       "currency": "INR",
+         *       "paid_at": "2026-10-30T08:50:46Z"
+         *     }
+         */
+        Purchase: {
+            /** @description Razorpay's order id. */
+            order_id: string;
+            /** @description Razorpay's payment id, as on the receipt; quote it to ask for a refund. */
+            payment_id: string;
+            pack_id: string;
+            label: string;
+            /** @description Practice time it added. */
+            seconds: number;
+            amount_paise: number;
+            currency: string;
+            /**
+             * Format: date-time
+             * @description When the payment was confirmed, UTC.
+             */
+            paid_at: string;
+        };
+        PurchaseList: {
+            /** @description Newest first. */
+            items: components["schemas"]["Purchase"][];
         };
         PaymentOrder: {
             /** @description Razorpay's order id, for Checkout. */
@@ -1236,6 +1289,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Account"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listPurchases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Purchases, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseList"];
                 };
             };
             400: components["responses"]["InvalidHost"];

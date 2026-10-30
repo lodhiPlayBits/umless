@@ -1,0 +1,4 @@
+.purchases-page { display: grid; gap: var(--space-5); }
+.purchases-page__head { display: grid; gap: var(--space-1); }
+.purchases-page__head h1 { margin: 0; font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em; }
+.purchases-page__head p { margin: 0; }

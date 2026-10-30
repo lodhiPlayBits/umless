@@ -45,9 +45,11 @@ export function formatPracticeTime(seconds: number): string {
   return rest ? `${Math.floor(minutes / 60)} h ${rest} min` : `${Math.floor(minutes / 60)} h`
 }
 
-/** The header chip's text: free transcriptions first, then paid time. */
+/** Everything left to practise with, e.g. "3 free + 1 h left"; paid time shows even while free remains. */
 export function practiceTimeLabel(account: Account): string {
-  if (account.free_transcriptions_left > 0) return `${account.free_transcriptions_left} free left`
-  if (account.seconds_left > 0) return `${formatPracticeTime(account.seconds_left)} left`
-  return 'Buy practice time'
+  const parts = [
+    account.free_transcriptions_left > 0 ? `${account.free_transcriptions_left} free` : null,
+    account.seconds_left > 0 ? formatPracticeTime(account.seconds_left) : null,
+  ].filter(Boolean)
+  return parts.length ? `${parts.join(' + ')} left` : 'Buy practice time'
 }

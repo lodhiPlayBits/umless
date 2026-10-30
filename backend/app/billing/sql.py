@@ -14,7 +14,7 @@ from sqlalchemy import (
     update,
 )
 
-from app.billing.store import NEW_ACCOUNT, Balance, Order, charged_seconds, utc_now
+from app.billing.store import NEW_ACCOUNT, PAID_AT_FORMAT, Balance, Order, charged_seconds, utc_now
 from app.db import metadata
 
 accounts = Table(
@@ -140,6 +140,15 @@ class SqlBillingStore:
                 )
             return self._read(conn, row.user_id)
 
+    def purchases(self, user_id: str) -> list[Order]:
+        query = (
+            select(payment_orders)
+            .where(payment_orders.c.user_id == user_id, payment_orders.c.status == "paid")
+            .order_by(payment_orders.c.paid_at.desc(), payment_orders.c.id)
+        )
+        with self._engine.connect() as conn:
+            return [_order(row) for row in conn.execute(query)]
+
 
 def _order(row) -> Order:
     return Order(
@@ -150,4 +159,5 @@ def _order(row) -> Order:
         seconds=row.seconds,
         status=row.status,
         payment_id=row.payment_id,
+        paid_at=row.paid_at.strftime(PAID_AT_FORMAT) if row.paid_at else None,
     )

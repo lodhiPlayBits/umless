@@ -6,6 +6,7 @@ import { formatPracticeTime, practiceTimeLabel, useAccount } from '../model/acco
 import { buyPack as realBuyPack } from '../model/purchase'
 import { packPrice, usePurchase } from '../model/usePurchase'
 import OutOfTimeBanner from './OutOfTimeBanner'
+import { PATHS } from '@/shared/config/paths'
 import './billing.css'
 
 /** The pack with the lowest price per minute: the one to recommend. */
@@ -99,6 +100,10 @@ export default function BillingPanel({ buyPack = realBuyPack }: { buyPack?: type
           refunded within 7 days: see the <Link to={`/${refunds.id}`}>{refunds.title}</Link>.
         </p>
       </Panel>
+
+      <p className="billing__note">
+        <Link to={PATHS.purchases}>See all your purchases and their payment ids →</Link>
+      </p>
     </div>
   )
 }

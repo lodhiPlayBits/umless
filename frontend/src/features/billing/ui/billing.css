@@ -10,3 +10,5 @@
 .billing__price { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing: -0.03em; }
 .billing__pack .ui-button { margin-top: var(--space-2); }
 .billing__note { font-size: var(--text-sm); line-height: var(--leading-sm); }
+.billing__purchases code { font-size: var(--text-xs); }
+.billing__purchases .ui-row__end { font-variant-numeric: tabular-nums; }

@@ -312,6 +312,53 @@ def test_payments_need_sign_in_and_orders_are_private(tmp_path):
         assert account(c, bob)["seconds_left"] == 0
 
 
+# --- purchases ---------------------------------------------------------------------------
+
+
+def test_a_paid_order_is_listed_as_a_purchase_with_its_receipt_id(client, contract_schema):
+    assert client.get("/api/payments").json() == {"items": []}
+    order, _ = pay(client, "session_1")
+    client.post("/api/payments/orders", json={"pack_id": "session_5"})  # opened, never paid
+
+    response = client.get("/api/payments")
+    assert response.status_code == 200
+    validate(contract_schema, "listPurchases", response)
+    [purchase] = response.json()["items"]
+    assert purchase["order_id"] == order["order_id"]
+    assert purchase["payment_id"] == f"pay_{order['order_id']}"
+    assert purchase["label"] == "1 session · 60 minutes"
+    assert (purchase["seconds"], purchase["amount_paise"], purchase["currency"]) == (3600, 4000, "INR")
+    assert purchase["paid_at"].endswith("Z")
+
+
+def test_purchases_are_newest_first_and_include_webhook_credits(client):
+    first, _ = pay(client, "session_1")
+    second = client.post("/api/payments/orders", json={"pack_id": "session_5"}).json()
+    webhook(client, captured(second["order_id"], 12000, payment_id="pay_hook"))
+
+    items = client.get("/api/payments").json()["items"]
+    assert [p["order_id"] for p in items] == [second["order_id"], first["order_id"]]
+    assert items[0]["payment_id"] == "pay_hook"
+
+
+def test_purchases_need_sign_in_and_are_private(tmp_path):
+    alice = {"Authorization": f"Bearer {make_token('user_alice')}"}
+    bob = {"Authorization": f"Bearer {make_token('user_bob')}"}
+    with TestClient(require_sign_in(metered_app(tmp_path)), base_url="http://localhost") as c:
+        pay(c, headers=alice)
+        assert c.get("/api/payments").status_code == 401
+        assert len(c.get("/api/payments", headers=alice).json()["items"]) == 1
+        assert c.get("/api/payments", headers=bob).json() == {"items": []}
+
+
+def test_without_razorpay_there_are_no_purchases(tmp_path, contract_schema):
+    settings = Settings(transcriber="fake", data_file=tmp_path / "q.json")
+    with TestClient(create_app(settings), base_url="http://localhost") as c:
+        response = c.get("/api/payments")
+    assert response.json() == {"items": []}
+    validate(contract_schema, "listPurchases", response)
+
+
 # --- webhook -----------------------------------------------------------------------------
 
 
@@ -439,6 +486,14 @@ def test_sql_billing_store(mysql_engine, tmp_path):
     assert store.get_order(order.id).status == "paid"
     assert store.charge(user, 59.2) == Balance(0, 3540)
     assert store.mark_paid("order_missing", "pay_1") is None
+
+    # Purchases: paid orders only, with their payment id and when they were paid.
+    open_order = Order(f"open_{tmp_path.name}"[:64], user, "session_5", 12000, 18000, "created")
+    store.add_order(open_order)
+    [purchase] = store.purchases(user)
+    assert (purchase.id, purchase.payment_id, purchase.status) == (order.id, "pay_1", "paid")
+    assert purchase.paid_at and purchase.paid_at.endswith("Z")
+    assert store.purchases(f"{tmp_path}/someone-else") == []
 
 
 # --- settings ----------------------------------------------------------------------------

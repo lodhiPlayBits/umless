@@ -15,6 +15,7 @@ export const PATHS = {
   history: '/history',
   questionHistory: '/history/:questionId',
   take: '/takes/:takeId',
+  purchases: '/purchases',
   settings: '/settings',
   settingsBilling: '/settings/billing',
 } as const

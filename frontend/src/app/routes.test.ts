@@ -16,6 +16,7 @@ describe('resolveRoute', () => {
     expect(resolve('/questions')).toEqual({ id: 'questions', params: {} })
     expect(resolve('/settings').id).toBe('settings')
     expect(resolve('/dashboard').id).toBe('dashboard')
+    expect(resolve('/purchases').id).toBe('purchases')
     expect(resolve('/settings/billing')).toEqual({ id: 'settingsBilling', params: { tab: 'billing' } })
     expect(resolve('/history').id).toBe('history')
     expect(resolve('/history/q1')).toEqual({ id: 'questionHistory', params: { questionId: 'q1' } })
@@ -62,7 +63,7 @@ describe('route table', () => {
   })
 
   it('lists the nav in order; every nav route is an app page', () => {
-    expect(navRoutes().map((r) => r.id)).toEqual(['dashboard', 'questions', 'history', 'settings'])
+    expect(navRoutes().map((r) => r.id)).toEqual(['dashboard', 'questions', 'history', 'purchases', 'settings'])
     for (const route of navRoutes()) expect(route.layout).toBe('app')
   })
 

@@ -8,9 +8,15 @@ import { PaymentFailedError } from '../model/checkout'
 import { purchaseErrorMessage } from '../model/usePurchase'
 import BillingPanel from './BillingPanel'
 import OutOfTimeBanner from './OutOfTimeBanner'
+import PurchaseHistory from './PurchaseHistory'
 
-vi.mock('../api/billingApi', async (importOriginal) => ({ ...(await importOriginal<typeof billingApi>()), getAccount: vi.fn() }))
+vi.mock('../api/billingApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof billingApi>()),
+  getAccount: vi.fn(),
+  listPurchases: vi.fn(),
+}))
 const getAccount = vi.mocked(billingApi.getAccount)
+const listPurchases = vi.mocked(billingApi.listPurchases)
 
 const packs: Account['packs'] = [
   { id: 'session_1', label: '1 session', seconds: 3600, amount_paise: 4000, currency: 'INR' },
@@ -18,7 +24,10 @@ const packs: Account['packs'] = [
 ]
 const account = (free: number, seconds: number, metered = true): Account => ({ metered, free_transcriptions_left: free, seconds_left: seconds, packs })
 
-beforeEach(() => getAccount.mockReset())
+beforeEach(() => {
+  getAccount.mockReset()
+  listPurchases.mockReset().mockResolvedValue([])
+})
 
 describe('BillingPanel', () => {
   it('shows what is left and every pack, the cheaper per minute marked best value', async () => {
@@ -30,6 +39,7 @@ describe('BillingPanel', () => {
     expect(within(best).getByRole('button', { name: 'Buy 5 sessions' })).toHaveClass('ui-button--primary')
     expect(screen.getByText(/₹0\.67 \/ min/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Refund & Cancellation Policy' })).toHaveAttribute('href', '/refunds')
+    expect(screen.getByRole('link', { name: /See all your purchases/ })).toHaveAttribute('href', '/purchases')
   })
 
   it('a payment that worked says so, with the new balance', async () => {
@@ -65,6 +75,47 @@ describe('BillingPanel', () => {
     getAccount.mockResolvedValue(account(0, 0, false))
     render(<BillingPanel buyPack={vi.fn()} />)
     expect(await screen.findByText("Practice time isn't counted here")).toBeInTheDocument()
+  })
+})
+
+describe('Purchases', () => {
+  const purchase = {
+    order_id: 'order_1',
+    payment_id: 'pay_Tu3lhmtObPkSdy',
+    pack_id: 'session_1',
+    label: '1 session · 60 minutes',
+    seconds: 3600,
+    amount_paise: 4000,
+    currency: 'INR',
+    paid_at: '2026-10-30T08:50:46Z',
+  }
+
+  it('lists each purchase with the time it added, the amount and its payment id', async () => {
+    listPurchases.mockResolvedValue([purchase])
+    render(<PurchaseHistory />)
+    const list = await screen.findByRole('region', { name: 'Purchases' })
+    expect(await within(list).findByText('1 session · 60 minutes · +1 h')).toBeInTheDocument()
+    expect(within(list).getByText('pay_Tu3lhmtObPkSdy')).toBeInTheDocument()
+    expect(within(list).getByText('₹40')).toBeInTheDocument()
+  })
+
+  it('says when there are none yet', async () => {
+    render(<PurchaseHistory />)
+    expect(await screen.findByText('No purchases yet')).toBeInTheDocument()
+  })
+
+  it('reloads after a payment on the Billing tab goes through', async () => {
+    getAccount.mockResolvedValue(account(0, 0))
+    listPurchases.mockResolvedValueOnce([]).mockResolvedValue([purchase])
+    render(
+      <>
+        <BillingPanel buyPack={vi.fn().mockResolvedValue({ status: 'paid', account: account(0, 3600) })} />
+        <PurchaseHistory />
+      </>,
+    )
+    await screen.findByText('No purchases yet')
+    await userEvent.click(screen.getByRole('button', { name: 'Buy 1 session' }))
+    expect(await screen.findByText('pay_Tu3lhmtObPkSdy')).toBeInTheDocument()
   })
 })
 

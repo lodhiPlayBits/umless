@@ -6,6 +6,7 @@ export type Pack = components['schemas']['Pack']
 export type PackId = Pack['id']
 export type PaymentOrder = components['schemas']['PaymentOrder']
 export type PaymentVerify = components['schemas']['PaymentVerify']
+export type Purchase = components['schemas']['Purchase']
 
 /** docs/api/openapi.yaml getAccount, createPaymentOrder, verifyPayment. */
 export function getAccount(signal?: AbortSignal): Promise<Account> {
@@ -18,4 +19,10 @@ export function createOrder(packId: PackId): Promise<PaymentOrder> {
 
 export function verifyPayment(payment: PaymentVerify): Promise<Account> {
   return unwrap(client.POST('/api/payments/verify', { body: payment }))
+}
+
+/** docs/api/openapi.yaml listPurchases: paid orders, newest first. */
+export async function listPurchases(signal?: AbortSignal): Promise<Purchase[]> {
+  const body = await unwrap(client.GET('/api/payments', { signal }))
+  return body.items
 }

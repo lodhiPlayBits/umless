@@ -4,6 +4,7 @@ import type { Pack } from '../api/billingApi'
 import { formatPracticeTime, setAccount } from './account'
 import { PaymentFailedError } from './checkout'
 import { buyPack as realBuyPack } from './purchase'
+import { invalidatePurchases } from './usePurchases'
 
 export type PurchaseOutcome = { kind: 'paid'; message: string } | { kind: 'failed'; message: string }
 
@@ -37,6 +38,7 @@ export function usePurchase(buyPack: typeof realBuyPack = realBuyPack) {
       const purchase = await buyPack(pack.id)
       if (purchase.status === 'paid') {
         setAccount(purchase.account)
+        void invalidatePurchases()
         result = { kind: 'paid', message: `Added ${formatPracticeTime(pack.seconds)} of practice time.` }
       }
     } catch (error) {

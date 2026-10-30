@@ -142,6 +142,11 @@ export const ICON_PATHS = {
       <path d="M12 5v14M5 12h14" />
     </>
   ),
+  receipt: (
+    <>
+      <path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z" /><path d="M9 8h6M9 12h6M9 16h3" />
+    </>
+  ),
   refresh: (
     <>
       <path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" />

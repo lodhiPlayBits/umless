@@ -45,6 +45,7 @@ const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const QuestionsPage = lazy(() => import('@/pages/QuestionsPage'))
 const PracticePage = lazy(() => import('@/pages/PracticePage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const PurchasesPage = lazy(() => import('@/pages/PurchasesPage'))
 const HistoryPage = lazy(() => import('@/pages/HistoryPage'))
 const QuestionHistoryPage = lazy(() => import('@/pages/QuestionHistoryPage'))
 const TakePage = lazy(() => import('@/pages/TakePage'))
@@ -118,6 +119,15 @@ export const ROUTES: readonly RouteDef[] = [
     width: 'wide',
   },
   { id: 'take', pattern: PATHS.take, access: 'signedIn', layout: 'app', title: 'Take', page: TakePage, parent: 'history', width: 'wide' },
+  {
+    id: 'purchases',
+    pattern: PATHS.purchases,
+    access: 'signedIn',
+    layout: 'app',
+    title: 'Purchases',
+    page: PurchasesPage,
+    nav: { label: 'Purchases', icon: 'receipt', order: 80 },
+  },
   {
     id: 'settings',
     pattern: PATHS.settings,

@@ -28,9 +28,11 @@ class Order:
     seconds: int
     status: str  # "created" or "paid"
     payment_id: str | None = None
+    paid_at: str | None = None  # UTC, "2026-10-30T08:50:46Z"
 
 
 NEW_ACCOUNT = Balance(FREE_TRANSCRIPTIONS, 0)
+PAID_AT_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def charged_seconds(duration_seconds: float) -> int:
@@ -53,6 +55,10 @@ class BillingStore(Protocol):
     def mark_paid(self, order_id: str, payment_id: str) -> Balance | None:
         """Credit the order's time to its user once. Paying an already paid order changes
         nothing. None if there is no such order."""
+        ...
+
+    def purchases(self, user_id: str) -> list[Order]:
+        """The user's paid orders, newest first. Opened-and-closed checkouts aren't purchases."""
         ...
 
 
@@ -93,10 +99,17 @@ class InMemoryBillingStore:
                 return None
             current = self._balances.get(order.user_id, NEW_ACCOUNT)
             if order.status != "paid":
-                self._orders[order_id] = replace(order, status="paid", payment_id=payment_id)
+                paid_at = utc_now().strftime(PAID_AT_FORMAT)
+                self._orders[order_id] = replace(order, status="paid", payment_id=payment_id, paid_at=paid_at)
                 current = replace(current, seconds_left=current.seconds_left + order.seconds)
                 self._balances[order.user_id] = current
             return current
+
+    def purchases(self, user_id: str) -> list[Order]:
+        with self._lock:
+            paid = [o for o in self._orders.values() if o.user_id == user_id and o.status == "paid"]
+        # Reversed insertion order breaks ties within a second: the later payment comes first.
+        return sorted(reversed(paid), key=lambda order: order.paid_at or "", reverse=True)
 
 
 def utc_now() -> datetime:
