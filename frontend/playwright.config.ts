@@ -41,8 +41,19 @@ export default defineConfig({
       command: `${python} -m uvicorn app.main:app --host 127.0.0.1 --port ${API_PORT}`,
       cwd: '../backend',
       url: `http://127.0.0.1:${API_PORT}/api/health`,
-      // Empty values override backend/.env: no MySQL and no sign-in, just the temp file.
-      env: { UMLESS_TRANSCRIBER: 'fake', UMLESS_DATA_FILE: dataFile, DB_HOST: '', CLERK_PUBLISHABLE_KEY: '' },
+      // Empty values override backend/.env: no MySQL, sign-in, bucket or payments, just the temp file.
+      env: {
+        UMLESS_TRANSCRIBER: 'fake',
+        UMLESS_DATA_FILE: dataFile,
+        DB_HOST: '',
+        CLERK_PUBLISHABLE_KEY: '',
+        OCI_BUCKET: '',
+        OCI_NAMESPACE: '',
+        OCI_REGION: '',
+        RAZORPAY_KEY_ID: '',
+        RAZORPAY_KEY_SECRET: '',
+        RAZORPAY_WEBHOOK_SECRET: '',
+      },
       reuseExistingServer: false,
       timeout: 60_000,
     },

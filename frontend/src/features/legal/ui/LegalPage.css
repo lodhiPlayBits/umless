@@ -1,0 +1,9 @@
+/* A readable legal document inside the marketing layout. */
+.legal { width: 100%; max-width: calc(var(--content-width) + 2 * var(--space-4)); margin-inline: auto; padding: var(--space-8) var(--space-4); }
+.legal > h1 { margin: 0 0 var(--space-2); font-size: clamp(32px, 6vw, 44px); line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; }
+.legal > h1 + p { margin: 0 0 var(--space-6); padding-bottom: var(--space-5); border-bottom: 1px solid var(--color-border); }
+.legal h2 { margin: var(--space-6) 0 var(--space-2); font-size: var(--text-lg); line-height: var(--leading-lg); font-weight: 600; }
+.legal p, .legal li { line-height: 26px; }
+.legal p { margin: 0 0 var(--space-3); }
+.legal ul, .legal ol { margin: 0 0 var(--space-3); padding-left: var(--space-5); display: grid; gap: var(--space-1); }
+.legal a { overflow-wrap: anywhere; }

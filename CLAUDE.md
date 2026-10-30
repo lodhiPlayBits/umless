@@ -29,14 +29,16 @@ backend/            FastAPI (Python 3.12), pytest
   app/questions/    domain.py (text rules), models.py (request validation), repository.py (JSON file), router.py
   app/transcription/ Transcriber interface, deepgram.py, fake.py, text.py (pause dots), router.py
   app/summary.py    filler flags, pauses, summary for the 200 body
-frontend/           React 19 + TypeScript + Vite 6, Vitest, Playwright
-  src/client.ts     openapi-fetch client + ApiError; src/generated/ is generated, never edit
-  src/apiErrors.ts  classifies failures: unreachable / validation / server
-  src/router.ts     small History-API router with a navigation guard
-  src/questions/    question list screens; questionsApi.ts
-  src/practice/     record, review, transcribe, result; practiceApi.ts
-  src/components/   dialogs, toast, error banners, ErrorBoundary
-  src/styles/theme.css  design tokens from docs/design/tokens.md
+frontend/           React 19 + TypeScript + Vite 6, Vitest, Playwright (layers: ADR 0005; imports only go down)
+  src/app/          main.tsx, App (access check + layout), routes.ts (route table), access.ts, layouts/, session/ClerkSession
+  src/pages/        one thin component per route
+  src/features/<x>/ questions, practice, billing, legal: api/ (*Api.ts), model/ (logic), ui/; index.ts is the public surface
+  src/shared/api/   client.ts (openapi-fetch + ApiError), apiErrors.ts; generated/ is generated, never edit
+  src/shared/lib/   router.ts (matchPath, navigate, navigation guard), formatting, small hooks
+  src/shared/config/paths.ts  every URL pattern; features build links from it
+  src/shared/ui/    dialogs, toast, error banners, ErrorBoundary, Link
+  src/shared/theme/ design tokens
+  src/content/      business details and copy as data
   tests/e2e/        Playwright specs, one per flow (F1–F4)
 ```
 
@@ -60,13 +62,14 @@ Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks
 
 ## Rules that aren't obvious from the code
 
-- **Contract first.** `docs/api/openapi.yaml` wins over the code. Changing it needs the user's OK and a line in the `docs/BUILD.md` decisions log. After a change, run `npm run gen:api` and commit the regenerated `src/generated/openapi.d.ts`.
+- **Contract first.** `docs/api/openapi.yaml` wins over the code. Changing it needs the user's OK and a line in the `docs/BUILD.md` decisions log. After a change, run `npm run gen:api` and commit the regenerated `src/shared/api/generated/openapi.d.ts`.
 - **One error body.** Every non-2xx response is `{code, detail, fields?}` with a code from `ErrorCode`. Raise `ApiError` in app code, never `HTTPException`.
 - **Security shape** (ADR 0001): bound to 127.0.0.1, only `localhost`/`127.0.0.1` Host headers, no CORS (Vite `server.cors: false` too), JSON-only question writes. Don't loosen these.
+- **Frontend layers** (ADR 0005): `app → pages → features → shared/content`. Another feature is imported only through `@/features/<name>`; inside a feature, imports are relative. ESLint enforces both.
 - **Frontend requests** (ADR 0002): only `*Api.ts` modules import the client (ESLint enforces it). Sort failures with `classifyApiError`. No hand-written `fetch` to contract endpoints.
 - **Pause dots** use the raw gap between words: `floor(gap + 0.001)` dots. The same rule drives `text`, `pause_count`, `longest_pause_seconds` and the frontend's highlighting (`summaryText.ts`). Change it everywhere or nowhere.
 - **Fillers** are exactly `um`, `uh`, `mhmm`. Deepgram's uh-huh, uh-uh, mm-mm and nuh-uh are yes/no answers and count as ordinary words.
-- **Styling:** plain CSS with tokens from `theme.css`; no hard-coded colours. Where `flows.md` and the wireframe disagree on wording, the wireframe wins.
+- **Styling:** plain CSS with tokens from `src/shared/theme/tokens.css` (the only file with colour values; light, dark and system). Build screens from `@/shared/ui` primitives (`ui-` classes, style guide at `/_ui` in dev); `app/index.css` is the old global layer, removed in Phase 6. Where `flows.md` and the wireframe disagree on wording, the wireframe wins.
 - **Questions file** `backend/data/questions.json` is git-ignored. A corrupt file stops startup and is never overwritten.
 
 ## Working with the user

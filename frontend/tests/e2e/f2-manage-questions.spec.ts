@@ -15,7 +15,7 @@ const saveButton = (page: Page) => page.getByRole('button', { name: 'Save', exac
 
 test('F2.1 the pencil turns the row into an inline field with Save and Cancel', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Edit question 2' }).click()
 
   await expect(editField(page)).toHaveValue('Beta')
@@ -26,14 +26,14 @@ test('F2.1 the pencil turns the row into an inline field with Save and Cancel', 
 
 test('F2.1 double-clicking the text starts editing', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha'])
-  await page.goto('/')
+  await page.goto('/questions')
   await rowTexts(page).first().dblclick()
   await expect(editField(page)).toHaveValue('Alpha')
 })
 
 test('F2.1 Esc cancels the edit and keeps the old text', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Edit question 1' }).click()
   await editField(page).fill('Changed')
   await editField(page).press('Escape')
@@ -44,7 +44,7 @@ test('F2.1 Esc cancels the edit and keeps the old text', async ({ page, request 
 
 test('F2.1 the Cancel button cancels the edit', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Edit question 1' }).click()
   await editField(page).fill('Changed')
   await page.getByRole('button', { name: 'Cancel' }).click()
@@ -53,7 +53,7 @@ test('F2.1 the Cancel button cancels the edit', async ({ page, request }) => {
 
 test('F2.1 a blank edit cannot be saved and shows no error', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Edit question 1' }).click()
   await editField(page).fill('   ')
   await expect(saveButton(page)).toBeDisabled()
@@ -64,7 +64,7 @@ test('F2.1 a blank edit cannot be saved and shows no error', async ({ page, requ
 
 test('F2.1 an edit over 500 characters shows the error and Save is disabled', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Edit question 1' }).click()
   await editField(page).fill('b'.repeat(512))
   await expect(page.getByText(/Keep questions under 500 characters/)).toBeVisible()
@@ -74,7 +74,7 @@ test('F2.1 an edit over 500 characters shows the error and Save is disabled', as
 
 test('F2.1 an edit that duplicates another question warns', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Edit question 2' }).click()
   await editField(page).fill(' alpha ')
   await expect(page.getByText('You already have this question')).toBeVisible()
@@ -83,7 +83,7 @@ test('F2.1 an edit that duplicates another question warns', async ({ page, reque
 
 test('F2.2 Enter saves the edit, shows a Saved tick, and the change persists', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta', 'Gamma'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Edit question 2' }).click()
   await editField(page).fill('Beta, revised')
   await editField(page).press('Enter')
@@ -98,7 +98,7 @@ test('F2.2 Enter saves the edit, shows a Saved tick, and the change persists', a
 
 test('F2.2 the Save button saves the edit', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Edit question 1' }).click()
   await editField(page).fill('Alpha two')
   await saveButton(page).click()
@@ -107,7 +107,7 @@ test('F2.2 the Save button saves the edit', async ({ page, request }) => {
 
 test('F2.2 a failed save keeps the row in edit mode with an inline error and the text', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.route('**/api/questions/*', (route) =>
     route.request().method() === 'PATCH' ? route.abort('connectionrefused') : route.fallback(),
   )
@@ -126,7 +126,7 @@ test('F2.2 a failed save keeps the row in edit mode with an inline error and the
 
 test('F2.3 Delete asks for confirmation, then removes the row and offers Undo', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Tell me about yourself', 'Gamma'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Delete question 2' }).click()
 
   await expect(dialog(page)).toBeVisible()
@@ -146,7 +146,7 @@ test('F2.3 Delete asks for confirmation, then removes the row and offers Undo', 
 
 test('F2.3 Undo re-creates the question in the same position', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta', 'Gamma'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Delete question 2' }).click()
   await dialog(page).getByRole('button', { name: 'Delete' }).click()
   await expect(rowTexts(page)).toHaveText(['Alpha', 'Gamma'])
@@ -160,7 +160,7 @@ test('F2.3 Undo re-creates the question in the same position', async ({ page, re
 
 test('F2.3 the Undo toast goes away after about 5 seconds', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Delete question 1' }).click()
   await dialog(page).getByRole('button', { name: 'Delete' }).click()
   await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible()
@@ -170,7 +170,7 @@ test('F2.3 the Undo toast goes away after about 5 seconds', async ({ page, reque
 
 test('F2.4 Cancel in the delete dialog leaves the list unchanged', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Delete question 1' }).click()
   await dialog(page).getByRole('button', { name: 'Cancel' }).click()
   await expect(dialog(page)).toHaveCount(0)
@@ -180,7 +180,7 @@ test('F2.4 Cancel in the delete dialog leaves the list unchanged', async ({ page
 
 test('F2.4 Esc in the delete dialog leaves the list unchanged', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Delete question 1' }).click()
   await expect(dialog(page)).toBeVisible()
   await page.keyboard.press('Escape')
@@ -190,7 +190,7 @@ test('F2.4 Esc in the delete dialog leaves the list unchanged', async ({ page, r
 
 test('F2.4 clicking outside the delete dialog leaves the list unchanged', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Delete question 1' }).click()
   await expect(dialog(page)).toBeVisible()
   await page.mouse.click(5, 5)
@@ -200,7 +200,7 @@ test('F2.4 clicking outside the delete dialog leaves the list unchanged', async 
 
 test('F2.5 a failed delete closes the dialog, keeps the row, and shows a toast', async ({ page, request }) => {
   await seedQuestions(request, ['Alpha', 'Beta'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.route('**/api/questions/*', (route) =>
     route.request().method() === 'DELETE' ? route.abort('connectionrefused') : route.fallback(),
   )
@@ -215,7 +215,7 @@ test('F2.5 a failed delete closes the dialog, keeps the row, and shows a toast',
 
 test('F2.6 deleting the last question shows the empty first-visit screen', async ({ page, request }) => {
   await seedQuestions(request, ['Only one'])
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('button', { name: 'Delete question 1' }).click()
   await dialog(page).getByRole('button', { name: 'Delete' }).click()
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { resetQuestions, seedQuestions } from './helpers'
+import { TRANSCRIPTIONS, resetQuestions, seedQuestions } from './helpers'
 
 // docs/design/flows.md, F4: Reviewing and keeping it (steps 1-8) and edge cases E12, E13, E14.
 
@@ -27,7 +27,7 @@ const startButton = (page: Page) => page.getByRole('button', { name: 'Start reco
 /** Opens the first question from the list, so the browser has a page to go Back to. */
 async function openFromList(page: Page, request: Request, texts = [QUESTION]) {
   const questions = await seedQuestions(request, texts)
-  await page.goto('/')
+  await page.goto('/questions')
   await page.getByRole('link', { name: /Practise/ }).first().click()
   await expect(startButton(page)).toBeVisible()
   return questions
@@ -75,7 +75,7 @@ function transcriptBody(words: { text: string; start: number; end: number }[], d
 }
 
 function fulfilTranscript(page: Page, body: unknown) {
-  return page.route('**/api/transcriptions', (route) =>
+  return page.route(TRANSCRIPTIONS, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
   )
 }
@@ -197,7 +197,7 @@ test('F4.8 Back to questions after downloading goes straight to the list', async
   await backToQuestions(page).click()
 
   await expect(dialog(page)).toHaveCount(0)
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/questions$/)
   await expect(page.locator('.q-row .text')).toHaveText([QUESTION])
 })
 
@@ -214,7 +214,7 @@ test('F4.8 Back to questions with nothing downloaded asks first; Stay keeps the 
   await expect(page.getByText(FAKE_TRANSCRIPT)).toBeVisible()
   await backToQuestions(page).click()
   await dialog(page).getByRole('button', { name: 'Leave' }).click()
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/questions$/)
 })
 
 test("E12 a transcript with no words shows \"We couldn't hear any words\", hides the summary and offers Practise again and audio", async ({
@@ -281,7 +281,7 @@ test('E14 the browser Back button leaves for the list when Leave is chosen', asy
   await page.goBack()
   await dialog(page).getByRole('button', { name: 'Leave' }).click()
 
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/questions$/)
 })
 
 test('E14 the browser Back button goes straight through after the audio was downloaded', async ({ page, request }) => {
@@ -289,7 +289,7 @@ test('E14 the browser Back button goes straight through after the audio was down
   await Promise.all([page.waitForEvent('download'), downloadAudio(page).click()])
   await page.goBack()
 
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/questions$/)
   await expect(dialog(page)).toHaveCount(0)
 })
 

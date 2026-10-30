@@ -1,0 +1,10 @@
+// Public surface of the marketing feature; other code imports only from here (ADR 0005 decision 1).
+export { default as CompareTable } from './ui/CompareTable'
+export { default as CtaBand } from './ui/CtaBand'
+export { default as Faq } from './ui/Faq'
+export { default as FeatureGrid } from './ui/FeatureGrid'
+export { default as Hero } from './ui/Hero'
+export { default as PracticeLoop } from './ui/PracticeLoop'
+export { default as PricingCards } from './ui/PricingCards'
+export { default as PrivacyPanel } from './ui/PrivacyPanel'
+export { default as Section } from './ui/Section'
