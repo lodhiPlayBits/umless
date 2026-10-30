@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import threading
+from datetime import datetime
 from typing import Protocol
 
 from app.takes.domain import Take
@@ -14,6 +15,11 @@ class TakeRepository(Protocol):
 
     def list(self, question_id: str) -> list[Take]:
         """The question's takes, newest first."""
+        ...
+
+    def recent(self, question_id: str | None, since: datetime | None, limit: int) -> list[Take]:
+        """Takes across questions (or one question's), saved at or after `since` (naive UTC),
+        newest first, at most `limit`."""
         ...
 
     def get(self, id: str) -> Take | None: ...
@@ -53,6 +59,17 @@ class InMemoryTakeRepository:
         # Insertion order breaks ties between takes created in the same second.
         return list(reversed(takes))
 
+    def recent(self, question_id: str | None, since: datetime | None, limit: int) -> list[Take]:
+        with self._store._lock:
+            takes = [take for owner, take in self._store._takes.values() if owner == self._user_id]
+        if question_id is not None:
+            takes = [take for take in takes if take.question_id == question_id]
+        if since is not None:
+            takes = [take for take in takes if _created(take) >= since]
+        # Newest first; reversed insertion order breaks ties within a second, as in list().
+        newest = sorted(reversed(takes), key=_created, reverse=True)
+        return newest[:limit]
+
     def get(self, id: str) -> Take | None:
         with self._store._lock:
             owner, take = self._store._takes.get(id, (None, None))
@@ -69,3 +86,7 @@ class InMemoryTakeRepository:
                 return False
             del self._store._takes[id]
         return True
+
+
+def _created(take: Take) -> datetime:
+    return datetime.strptime(take.created_at, "%Y-%m-%dT%H:%M:%SZ")

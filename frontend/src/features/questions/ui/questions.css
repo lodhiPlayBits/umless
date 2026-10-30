@@ -28,3 +28,7 @@
   border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font: 500 var(--text-sm)/var(--leading-sm) var(--font-sans); cursor: pointer;
 }
 .q-chip:hover { background: var(--color-surface); }
+
+.q-quick { display: grid; gap: var(--space-4); }
+.q-quick__suggestions { display: grid; gap: var(--space-2); }
+.q-quick__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }

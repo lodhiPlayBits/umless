@@ -138,7 +138,7 @@ The recording a user made in one attempt: an audio `Blob`, its MIME type (`audio
 
 A take is one transcribed answer to a question, saved when the browser transcribes with `questionId` (`app/takes/`). The audio is never stored; only the transcript.
 
-- **Record** (MySQL table `takes`, migration `0002`): `id` CHAR(36), `user_id` VARCHAR(255), `question_id` VARCHAR(64), `created_at` DATETIME (UTC), `duration_seconds` FLOAT NULL, `summary` JSON (the TranscriptSummary, so lists need no download); index on (`user_id`, `question_id`, `created_at`); `utf8mb4_bin`.
+- **Record** (MySQL table `takes`, migration `0002`): `id` CHAR(36), `user_id` VARCHAR(255), `question_id` VARCHAR(64), `created_at` DATETIME (UTC), `duration_seconds` FLOAT NULL, `summary` JSON (the TranscriptSummary, so lists need no download); indexes on (`user_id`, `question_id`, `created_at`) and, from migration `0004`, (`user_id`, `created_at`) for `GET /api/takes` across questions; `utf8mb4_bin`.
 - **Transcript** (OCI Object Storage, bucket `OCI_BUCKET`): `users/<url-encoded user id>/takes/<take id>.json` holding `{version: 1, take_id, question_id, question_text (snapshot), created_at, transcript}`; `transcript` is the createTranscription body without `take_id`.
 - Saving writes the object first, then the record (a failed record removes the object). Deleting removes the object first, then the record, so a failed delete can be retried. Deleting a question deletes its takes; Undo brings back the question only.
 - Every query filters on `user_id`; another user's take id behaves like a missing one (404). Without a database or bucket (local use) both live in memory until the server stops.

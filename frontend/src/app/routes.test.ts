@@ -15,6 +15,10 @@ describe('resolveRoute', () => {
     expect(resolve('/sign-up').id).toBe('signUp')
     expect(resolve('/questions')).toEqual({ id: 'questions', params: {} })
     expect(resolve('/settings').id).toBe('settings')
+    expect(resolve('/dashboard').id).toBe('dashboard')
+    expect(resolve('/history').id).toBe('history')
+    expect(resolve('/history/q1')).toEqual({ id: 'questionHistory', params: { questionId: 'q1' } })
+    expect(resolve('/takes/t1')).toEqual({ id: 'take', params: { takeId: 't1' } })
   })
 
   it('maps /practice/<id> to the practice page, percent-decoding the id', () => {
@@ -57,7 +61,7 @@ describe('route table', () => {
   })
 
   it('lists the nav in order; every nav route is an app page', () => {
-    expect(navRoutes().map((r) => r.id)).toEqual(['questions', 'settings'])
+    expect(navRoutes().map((r) => r.id)).toEqual(['dashboard', 'questions', 'history', 'settings'])
     for (const route of navRoutes()) expect(route.layout).toBe('app')
   })
 

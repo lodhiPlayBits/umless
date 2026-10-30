@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError } from '@/shared/api/client'
 import { useDelayedFlag } from '@/shared/lib/useDelayedFlag'
+import { usageByQuestion } from '@/features/progress'
+import { useAllTakes } from '@/features/takes'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog'
 import LoadErrorBanner from '@/shared/ui/LoadErrorBanner'
 import Toast from '@/shared/ui/Toast'
@@ -12,7 +14,7 @@ import './questions.css'
 import * as api from '../api/questionsApi'
 import { matchesFilter } from '../model/questionText'
 import type { Question } from '../model/questionText'
-import { invalidateQuestions, updateCachedQuestions, useQuestions } from '../model/useQuestions'
+import { SUGGESTED_QUESTIONS, addQuestion, invalidateQuestions, updateCachedQuestions, useQuestions } from '../model/useQuestions'
 
 /** docs/design/flows.md F1: skeleton rows only after 300 ms; the query gives up after 10 s. */
 const SKELETON_DELAY_MS = 300
@@ -20,16 +22,13 @@ const UNDO_MS = 5000
 const SAVED_TICK_MS = 2000
 const FILTER_FROM = 11
 
-const SUGGESTIONS = [
-  'Tell me about yourself.',
-  "What's your biggest weakness?",
-  'Explain your last project in two minutes.',
-]
-
 type Load = { status: 'loading' } | { status: 'error'; error: ApiError } | { status: 'ready' }
 
 export default function QuestionsScreen() {
   const query = useQuestions()
+  // How often each question was practised, from one list of recent takes (not one request per question).
+  const takes = useAllTakes({ limit: 1000 })
+  const usage = useMemo(() => (takes.isSuccess ? usageByQuestion(takes.data) : null), [takes.isSuccess, takes.data])
   const questions = query.data ?? []
   // A Retry after an error is a fresh load (banner gone, field disabled); a refetch over loaded data isn't.
   const load: Load =
@@ -61,11 +60,6 @@ export default function QuestionsScreen() {
     const timer = window.setTimeout(() => setSavedId(null), SAVED_TICK_MS)
     return () => window.clearTimeout(timer)
   }, [savedId])
-
-  async function addQuestion(text: string) {
-    const created = await api.createQuestion(text)
-    updateCachedQuestions((qs) => [...qs, created])
-  }
 
   async function addSuggestion(text: string) {
     try {
@@ -171,7 +165,7 @@ export default function QuestionsScreen() {
         <EmptyState
           icon="list"
           title="No questions yet."
-          actions={SUGGESTIONS.map((text) => (
+          actions={SUGGESTED_QUESTIONS.map((text) => (
             <button key={text} type="button" className="q-chip" onClick={() => void addSuggestion(text)}>
               + {text}
             </button>
@@ -214,6 +208,7 @@ export default function QuestionsScreen() {
                   onCancelEdit={() => setEditingId(null)}
                   onSave={(text) => saveEdit(question, text)}
                   onDelete={() => setPendingDelete(question)}
+                  usage={usage ? usage.get(question.id) : null}
                 />
               ))}
             </ul>

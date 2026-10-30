@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { refreshAccountIfShown } from '@/features/billing'
+import { invalidateTakes } from '@/features/takes'
 import { ApiError } from '@/shared/api/client'
 import { baseFileName } from '@/shared/lib/filenames'
 import { navigate, useNavigationGuard } from '@/shared/lib/router'
@@ -10,7 +11,6 @@ import type { PracticeQuestion } from '../api/practiceApi'
 import { initialStage, practiceReducer, takeOf } from './practiceMachine'
 import { RecorderError, extensionFor, isRecordingSupported, startRecording as realStartRecording } from './recorder'
 import type { AutoStopReason, RecorderHandle, Recording } from './recorder'
-import { invalidateTakes } from './useTakes'
 
 /** The browser's permission prompt is only explained if it hasn't answered by then (F3.2). */
 const PERMISSION_HINT_MS = 400

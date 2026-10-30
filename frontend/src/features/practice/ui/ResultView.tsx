@@ -4,8 +4,7 @@ import { formatClock } from '@/shared/lib/timeLabel'
 import { useObjectUrl } from '@/shared/lib/useObjectUrl'
 import { Button, ButtonLink, EmptyState, Icon, buttonClass } from '@/shared/ui'
 import type { Transcript } from '../api/practiceApi'
-import { summaryRows, transcriptFile } from '../model/summaryText'
-import TranscriptCard from './TranscriptCard'
+import { TranscriptCard, summaryRows, transcriptFile } from '@/features/takes'
 
 interface ResultViewProps {
   question: string

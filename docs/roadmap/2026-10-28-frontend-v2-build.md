@@ -103,6 +103,37 @@ Done when:
     - screenshots of the questions, editing, empty, ready, recording, review, result and dialog states on desktop and phone, light and dark.
   - Moved to Phase 7: the question list's "practised N× · fillers/min" line and the practice route's lookup through the questions cache. Both need `GET /api/takes`.
 
+- 2026-10-30: **Phase 7 done.**
+  - Backend: `GET /api/takes` (`listAllTakes`) with `questionId`, `since` and `limit`.
+    - An unknown `questionId` returns an empty list, not a 404.
+    - `since` is checked strictly against RFC 3339. Schemathesis found that pydantic accepted `since=0.5` as a Unix timestamp.
+    - Migration 0004 adds the `(user_id, created_at)` index; it is applied in production.
+    - Backend tests: 528 passed, including the MySQL tests against a throwaway MySQL 8.4 container and the contract fuzzing.
+  - Frontend:
+    - `features/takes` now owns take data and display, moved from practice with `git mv`: API, query keys, `TranscriptCard`, `PastTakes`, the summary text. Every takes query sits under `['takes']`.
+    - `features/progress` holds the pure stat functions (day groups, relative days, usage per question, best take, progress per question, trend) with table tests.
+    - `features/history` has `/history` (question filter, 7/30/All, Today/This week/Earlier, best and high badges), `/history/:questionId` (four stats, chart, takes) and `/takes/:id` (summary, transcript, .txt, delete).
+    - History is in the nav. The questions list shows "Practised N× · last … · X fillers/min" or "New", from one request.
+  - Results:
+    - unit tests: 402 passed;
+    - Playwright: 82 passed;
+    - screenshots of every History screen with real takes, from which I fixed best-on-ties, the heading layout, same-day chart labels and the badge position on phones.
+  - Still open: the practice route still finds its question through its own request, not the questions cache. Low value; leaving it.
+
+- 2026-10-30: **Phase 8 done.**
+  - `/dashboard` is now the signed-in home (`HOME_PATH`) and first in the nav.
+  - Two states:
+    - **First visit** (no takes yet): a 3-step checklist, `QuickAddQuestion` (field plus starter chips) or "Record your first answer", and a preview.
+    - **Returning:** a streak line, a "Practise next" card (the first question never tried, else the one practised longest ago), four stats against last week (takes, fillers/min, pace with a 130–160 note, average longest pause), an 8-week trend chart with a summary line, and 4 recent takes.
+  - New pure functions with table tests:
+    - in `features/progress`: `weekComparison`, `practiceStreak` (alive until a whole day is missed), `weeklyTrend` (empty weeks left out), `nextQuestion`, `paceNote`;
+    - in `features/dashboard/model`: `weekDelta`, `trendSummary`.
+  - `addQuestion` and `SUGGESTED_QUESTIONS` moved into the questions model, shared by the Questions screen and the Dashboard.
+  - Results:
+    - unit tests: 433 passed;
+    - Playwright: 82 passed;
+    - screenshots of the first visit (empty, and with a question) and of returning (desktop and phone). From them I made the streak line say which day you practised.
+
 ## Where the design and the live product differ (decided here, unless you say otherwise)
 
 | Design shows | We build | Why |

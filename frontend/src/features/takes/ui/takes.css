@@ -1,0 +1,11 @@
+/* Saved takes and transcripts, wherever they are shown (practice, history). Tokens only. */
+.result-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--text-xs); line-height: var(--leading-xs); color: var(--color-text-muted); }
+.result-transcript { font-size: 18px; line-height: 32px; max-height: 60vh; overflow-y: auto; overflow-wrap: anywhere; }
+.result-transcript:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: var(--radius-sm); }
+.past-takes { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
+.past-takes h2 { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.past-takes p { margin: 0; }
+.take-body { display: grid; gap: var(--space-3); padding: 0 var(--space-5) var(--space-4); }
+.past-takes .ui-row { min-height: 64px; }
+.take-body { justify-items: start; }
+.take-body .transcript { justify-self: stretch; }

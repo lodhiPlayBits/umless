@@ -1,5 +1,8 @@
 """One user's take history: records in the take store, transcripts in object storage."""
 
+# Postponed annotations: the method named `list` would otherwise shadow the builtin.
+from __future__ import annotations
+
 import json
 import logging
 import uuid
@@ -54,6 +57,13 @@ class TakeHistory:
 
     def list(self, question_id: str) -> list[Take]:
         return self._records.list(question_id)
+
+    def recent(self, question_id: str | None, since: datetime | None, limit: int) -> list[Take]:
+        """Takes across questions, newest first (History, Dashboard). `since` may carry a time
+        zone; records are kept in naive UTC."""
+        if since is not None and since.tzinfo is not None:
+            since = since.astimezone(timezone.utc).replace(tzinfo=None)
+        return self._records.recent(question_id, since, limit)
 
     def transcript(self, take_id: str) -> tuple[Take, dict] | None:
         """The take and its transcript, or None if this user has no such take."""

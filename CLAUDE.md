@@ -32,7 +32,7 @@ backend/            FastAPI (Python 3.12), pytest
 frontend/           React 19 + TypeScript + Vite 6, Vitest, Playwright (layers: ADR 0005; imports only go down)
   src/app/          main.tsx, App (access check + layout), routes.ts (route table), access.ts, layouts/, session/ClerkSession
   src/pages/        one thin component per route
-  src/features/<x>/ questions, practice, billing, legal: api/ (*Api.ts), model/ (logic), ui/; index.ts is the public surface
+  src/features/<x>/ questions, practice, takes, progress, history, billing, marketing, legal: api/ (*Api.ts), model/ (logic), ui/; index.ts is the public surface
   src/shared/api/   client.ts (openapi-fetch + ApiError), apiErrors.ts; generated/ is generated, never edit
   src/shared/lib/   router.ts (matchPath, navigate, navigation guard), formatting, small hooks
   src/shared/config/paths.ts  every URL pattern; features build links from it

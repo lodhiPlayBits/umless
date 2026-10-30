@@ -10,6 +10,7 @@ import type { Take, TakeSummary, TakesApi } from '../api/takesApi'
 import { takeDate, takeStats } from '../model/takesText'
 import TranscriptCard from './TranscriptCard'
 import { removeCachedTake, useQuestionTakes } from '../model/useTakes'
+import './takes.css'
 
 type Opened = { id: string; take: Take | null; failed: boolean }
 
@@ -52,7 +53,7 @@ export default function PastTakes({ questionId, question, api = realTakesApi }: 
         return
       }
     }
-    removeCachedTake(questionId, take.id)
+    removeCachedTake(take.id)
     if (opened?.id === take.id) setOpened(null)
   }
 

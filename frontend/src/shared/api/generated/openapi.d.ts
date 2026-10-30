@@ -138,6 +138,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/takes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List saved takes across all questions, newest first
+         * @description The signed-in user's takes, optionally for one question and since a time, newest first and at most `limit`. An unknown questionId is a filter that matches nothing (an empty list), not a 404.
+         */
+        get: operations["listAllTakes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/takes/{takeId}": {
         parameters: {
             query?: never;
@@ -1112,6 +1132,37 @@ export interface operations {
             400: components["responses"]["InvalidHost"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["QuestionNotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listAllTakes: {
+        parameters: {
+            query?: {
+                /** @description Only this question's takes. */
+                questionId?: string;
+                /** @description Only takes saved at or after this time. */
+                since?: string;
+                /** @description The most takes to return. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The takes, newest first; each without its transcript. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakeList"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["ValidationError"];
             500: components["responses"]["InternalError"];
         };
     };

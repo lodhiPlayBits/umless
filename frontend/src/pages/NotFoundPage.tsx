@@ -1,4 +1,4 @@
-import { HOME_PATH, PATHS } from '@/shared/config/paths'
+import { PATHS } from '@/shared/config/paths'
 import { useSession } from '@/shared/lib/session'
 import { ButtonLink, EmptyState } from '@/shared/ui'
 import './NotFoundPage.css'
@@ -17,7 +17,7 @@ export default function NotFoundPage() {
         title="That page doesn't exist"
         actions={
           signedIn ? (
-            <ButtonLink to={HOME_PATH} variant="primary">
+            <ButtonLink to={PATHS.questions} variant="primary">
               Back to questions
             </ButtonLink>
           ) : (
