@@ -31,6 +31,7 @@ backend/            FastAPI (Python 3.12), pytest
   app/summary.py    filler flags, pauses, summary for the 200 body
   app/log.py        queue logging (QueueHandler + listener thread to stdout), started by the lifespan; UMLESS_LOG_LEVEL
   app/limits.py     transcription limits: one at a time and 30/hour per user, Redis or in memory (ADR 0006)
+backup/             nightly mysqldump to an OCI bucket, restore-test.sh (docs/runbooks/backups.md)
 redis/              Redis service (compose + redis.conf), for the transcription limits; password in redis/.env
 frontend/           React 19 + TypeScript + Vite 6, Vitest, Playwright (layers: ADR 0005; imports only go down)
   src/app/          main.tsx, App (access check + layout), routes.ts (route table), access.ts, layouts/, session/ClerkSession

@@ -14,9 +14,9 @@ Owners: **You** = dashboards, accounts, DNS, legal wording (only you can do thes
 
 | # | Phase | Size | Status |
 |---|---|---|---|
-| 0 | Secure and ship today's work | S | not-started |
-| 1 | Payments can't lose money | S | not-started |
-| 2 | Backups you've actually restored | M | not-started |
+| 0 | Secure and ship today's work | S | deferred to just before launch (2026-10-30) |
+| 1 | Payments can't lose money | S | done |
+| 2 | Backups you've actually restored | M | in-progress |
 | 3 | Know when it breaks | M | not-started |
 | 4 | Production sign-in (Clerk) | M | not-started |
 | 5 | Legal pages and deleting data | M | not-started |
@@ -24,11 +24,43 @@ Owners: **You** = dashboards, accounts, DNS, legal wording (only you can do thes
 | 7 | Hardening (CSP, free-tier abuse, Safari) | M | not-started |
 | 8 | Launch | S | not-started |
 
-Order: 0 → 1 first (live money is at risk today). 2 and 3 next. 4 before 5 (the deletion webhook lives on the production Clerk instance). 6 and 7 can run alongside 4–5. 8 last.
+Order: 1 first (live money was at risk). Phase 0 is deferred to just before launch (your decision, 2026-10-30), **except** its Redis step: the backend on disk needs `REDIS_URL`, so Redis must be set up at the first backend rebuild (Phases 3–5 all rebuild it). 2 and 3 next. 4 before 5 (the deletion webhook lives on the production Clerk instance). 6 and 7 can run alongside 4–5. 8 last.
 
 ## Progress
 
 <!-- One entry per finished phase: date, what was done, results. -->
+
+- 2026-10-31: **Phase 1, steps 1–3 done.**
+  - The Razorpay live webhook points at `https://umless.in/api/payments/webhook` with 2 events, and `RAZORPAY_WEBHOOK_SECRET` is in `backend/.env`. The backend was recreated with it (same image).
+  - Checked on the live site:
+    - no signature → 400 `payment_invalid`;
+    - wrong signature → 400;
+    - correctly signed test event → 200 `ignored`.
+  - Left: the closed-tab ₹40 purchase (step 4) and the refund runbook (step 5).
+- 2026-10-31: **Phase 1 done.**
+  - Closed-tab purchase (`pay_TuEBiLU32DEp4g`, ₹40): the backend log shows the order created, then two webhook deliveries (200, 200) and **no** `/api/payments/verify` call. The webhook alone credited the 60 minutes, once.
+  - Refund runbook: `docs/runbooks/refunds.md`. Its MySQL shell command and refund SQL were checked against a throwaway `mysql:8.4`. It keeps a refunded order's status `paid`, so a late webhook retry can't credit it again.
+- 2026-10-31: **Phase 2: HeatWave checked; our own dumps built.**
+  - Findings on `mysql20261024145824` (Always Free, Mumbai):
+    - automatic backups are on, but kept for **1 day**;
+    - point-in-time recovery, manual backups and longer retention are greyed out on the free tier;
+    - restoring into a new DB system may not be possible (one free system).
+  - So the nightly dump (step 3) is now the **main** backup, done first. Paying for a bigger DB system isn't worth it at this size; revisit with volume.
+  - Built `backup/`, with the runbook `docs/runbooks/backups.md`:
+    - a nightly gzipped `mysqldump` at 20:30 UTC to a private bucket;
+    - 30 days kept, the newest 7 never deleted;
+    - unhealthy after 26 h without a success;
+    - `restore-test.sh` restores the newest dump into a throwaway MySQL and compares row counts with production.
+  - Tested:
+    - unit tests for retention and scheduling;
+    - a real dump with a user without PROCESS (like HeatWave's), restored with JSON and Unicode intact.
+  - Not yet run against OCI: it needs the bucket and policy (runbook, Setup 1–2).
+- 2026-10-30: **Phase 2, nightly backups live.**
+  - Bucket `umless-backups` created (private), and the `umless-bucket-access` policy extended. The VM can list, write, read and delete there. `get_bucket` gives a 404, which is expected: the policy grants objects, not buckets.
+  - First backup: `mysql/umless-20261030T192501Z.sql.gz`, 2.0 kB, 3.3 s. The next runs nightly at 20:30 UTC.
+  - **Restore test OK:** accounts 3/3, alembic_version 1/1, payment_orders 8/8, questions 2/2, takes 4/4.
+  - Left: versioning on the transcripts bucket (step 4), `.env` files in a password manager (step 5), the recovery runbook (step 6).
+- 2026-10-31: **Phase 2, step 6 done:** `docs/runbooks/disaster-recovery.md`, rebuilding on a new VM (Ubuntu 24.04, Ampere A1) from GitHub, the six `.env` files, HeatWave or the dumps, with a checklist. Not yet rehearsed. Left: steps 4 and 5 (you).
 
 ## Phases
 
@@ -60,11 +92,11 @@ Done when: the closed-tab purchase is credited by the webhook alone, and the run
 
 A backup you haven't restored is a guess.
 
-1. **You:** OCI console → MySQL HeatWave DB system → Backups: check automatic backups are on, note retention (aim for 7+ days) and whether point-in-time recovery is on. Turn both on if not.
-2. **You + Claude:** restore the latest backup to a **new, temporary** DB system; check the row counts of `questions`, `takes`, `accounts` and `payment_orders` against production; delete the temporary system.
-3. **Claude:** a nightly logical dump (`mysqldump` in a small container, cron or a compose service) to a separate OCI bucket with a 30-day lifecycle rule, as a second, provider-independent copy. A test restores the dump into a throwaway `mysql:8.4` container.
+1. ~~**You:** check HeatWave's automatic backups.~~ Done: 1 day only, and the free tier can't change it (see Progress).
+2. **Claude (done) + You:** the nightly dump (`backup/`) is the main backup. **You:** bucket, policy and `backup/.env` (runbook Setup 1–3), then start it.
+3. **You:** run `backup/restore-test.sh` once the first dump is in the bucket; it must end `OK`.
 4. **You:** the transcripts bucket: turn on object versioning (or a retention rule) so a bad delete can be undone.
-5. **You:** keep a copy of every `.env` (backend, redis, deploy) in a password manager. If the VM is lost, these are the only copy.
+5. **You:** keep a copy of all six `.env` files (`backend/`, repo root, `frontend/`, `deploy/`, `redis/`, `backup/`) in a password manager. If the VM is lost, these are the only copy.
 6. **Claude:** `docs/runbooks/disaster-recovery.md`: rebuild the whole stack on a fresh VM from git, the password manager and the backups, step by step, with the time it took.
 
 Done when: one restore has been done and checked, the nightly dump has run at least twice, and the recovery runbook exists.

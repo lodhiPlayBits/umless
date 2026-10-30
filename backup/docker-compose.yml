@@ -1,0 +1,36 @@
+# Nightly MySQL backups to an OCI bucket. Included by deploy/docker-compose.yml; can also be
+# run on its own from this folder. Set up and restore: docs/runbooks/backups.md.
+name: umless
+
+services:
+  backup:
+    build: .
+    image: umless-backup
+    container_name: umless-backup
+    # Only the backup's own settings (DB_*, BACKUP_BUCKET, OCI_*). Not backend/.env: that
+    # holds the Deepgram and Razorpay secrets, which the backup has no use for.
+    env_file:
+      - path: .env
+        required: false
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      # Unhealthy when no backup has succeeded in 26 hours (one nightly run plus slack).
+      test: ["CMD", "python3", "-c", "import os, sys, time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/last-success') < 26 * 3600 else 1)"]
+      interval: 10m
+      timeout: 10s
+      retries: 1
+      # The first backup runs at start; give it time before the first check.
+      start_period: 10m
+    networks:
+      - umless
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  umless:
+    name: umless
