@@ -6,6 +6,7 @@ from dotenv import dotenv_values
 from sqlalchemy import URL
 
 from app.auth import clerk_issuer
+from app.log import LOG_LEVELS
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 # backend/.env wins over a repo-root .env; real environment variables win over both.
@@ -46,6 +47,13 @@ class Settings:
     razorpay_key_id: str | None = None
     razorpay_key_secret: str | None = field(default=None, repr=False)
     razorpay_webhook_secret: str | None = field(default=None, repr=False)
+    # Set (from REDIS_URL): transcription limits are shared by every worker. Unset: in memory.
+    redis_url: str | None = field(default=None, repr=False)
+    # Per user, each clock hour; protects the Deepgram bill (docs/adr/0006-redis-limits.md).
+    transcriptions_per_hour: int = 30
+    # Set (from_env: UMLESS_LOG_LEVEL, default INFO): the lifespan starts queue logging (app/log.py).
+    # None (tests building Settings directly): logging is left as it is, so pytest's capture works.
+    log_level: str | None = None
 
     @classmethod
     def from_env(cls, env_files: tuple[Path, ...] = ENV_FILES) -> "Settings":
@@ -89,6 +97,16 @@ class Settings:
         # A public, multi-user server must never hand out unmetered (unpaid) transcription.
         if database is not None and not key_id:
             raise ValueError("DB_HOST is set, so RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set too")
+        redis_url = (values.get("REDIS_URL") or "").strip()
+        # A public server keeps its limits in Redis, shared by every worker and restart.
+        if database is not None and not redis_url:
+            raise ValueError("DB_HOST is set, so REDIS_URL must be set too")
+        per_hour = (values.get("UMLESS_TRANSCRIPTIONS_PER_HOUR") or "30").strip()
+        if not per_hour.isdigit() or int(per_hour) < 1:
+            raise ValueError(f"UMLESS_TRANSCRIPTIONS_PER_HOUR must be a whole number above 0, got {per_hour!r}")
+        log_level = (values.get("UMLESS_LOG_LEVEL") or "INFO").strip().upper()
+        if log_level not in LOG_LEVELS:
+            raise ValueError(f"UMLESS_LOG_LEVEL must be one of {list(LOG_LEVELS)}, got {log_level!r}")
         return cls(
             deepgram_api_key=values.get("DEEPGRAM_API_KEY") or None,
             transcriber=transcriber,
@@ -102,6 +120,9 @@ class Settings:
             razorpay_key_id=key_id or None,
             razorpay_key_secret=key_secret or None,
             razorpay_webhook_secret=(values.get("RAZORPAY_WEBHOOK_SECRET") or "").strip() or None,
+            redis_url=redis_url or None,
+            transcriptions_per_hour=int(per_hour),
+            log_level=log_level,
         )
 
 

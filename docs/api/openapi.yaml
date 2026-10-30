@@ -222,6 +222,10 @@ paths:
         time left, checked before Deepgram is called (otherwise 402). A transcript with words
         then uses one free transcription, or deducts its length (rounded up to a second) from
         paid time, never below zero. A transcript with no words is free.
+
+        Each user runs one transcription at a time (another while one runs: 409) and at most a
+        set number each clock hour, 30 by default (over it: 429). Both are checked before
+        Deepgram is called; a refused audio type doesn't count towards the hour.
       x-screen:
         - practice-review / transcribe recording
         - practice-transcribe-error / retry transcription
@@ -293,6 +297,15 @@ paths:
               example:
                 code: payment_required
                 detail: You're out of practice time. Buy a session to keep going.
+        '409':
+          description: Another transcription of this user's is still running.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: transcription_in_progress
+                detail: Your other recording is still being transcribed. Wait for it to finish.
         '415':
           description: The Content-Type is missing or not one of the accepted audio types.
           content:
@@ -302,6 +315,15 @@ paths:
               example:
                 code: unsupported_audio_type
                 detail: Unsupported audio type. Send audio/webm, audio/ogg, audio/mp4, audio/wav or audio/mpeg.
+        '429':
+          description: The user has made this hour's maximum number of transcriptions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: rate_limited
+                detail: You've made a lot of recordings this hour. Try again in a few minutes.
         '500':
           $ref: '#/components/responses/InternalError'
         '502':
@@ -1337,6 +1359,8 @@ components:
         - unsupported_audio_type
         - transcription_failed
         - transcription_unavailable
+        - transcription_in_progress
+        - rate_limited
         - storage_unavailable
         - invalid_host
         - unauthorized

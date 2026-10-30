@@ -9,6 +9,7 @@ from app.billing.store import BillingStore
 from app.config import Settings
 from app.errors import ApiError
 from app.http import get_settings, media_type
+from app.limits import TranscriptionLimits
 from app.questions.domain import Question
 from app.questions.router import get_question_repository, question_not_found
 from app.summary import transcript_body
@@ -74,6 +75,38 @@ async def transcribe(
             " or audio/mpeg.",
         )
 
+    # One at a time per user, so parallel uploads can't all pass the balance check below.
+    limits: TranscriptionLimits = request.app.state.limits
+    token = await limits.acquire(user_id)
+    if token is None:
+        logger.info("Refused a transcription for %s: another is in progress", user_id)
+        raise ApiError(
+            409,
+            "transcription_in_progress",
+            "Your other recording is still being transcribed. Wait for it to finish.",
+        )
+    try:
+        if not await limits.allow(user_id):
+            logger.info("Refused a transcription for %s: over the hourly cap", user_id)
+            raise ApiError(
+                429,
+                "rate_limited",
+                "You've made a lot of recordings this hour. Try again in a few minutes.",
+            )
+        return await transcribe_one(request, question_id, user_id, settings, transcriber, billing, content_type)
+    finally:
+        await limits.release(user_id, token)
+
+
+async def transcribe_one(
+    request: Request,
+    question_id: str | None,
+    user_id: str,
+    settings: Settings,
+    transcriber: Transcriber,
+    billing: BillingStore | None,
+    content_type: str,
+) -> dict:
     # Checked before the paid Deepgram call. The repositories block, so they run in the threadpool.
     # The stores are only needed to save a take, so a plain transcription doesn't touch them.
     question = None
@@ -111,6 +144,15 @@ async def transcribe(
         await charge(billing, user_id, body)
     if question is not None:
         body["take_id"] = await save_take(get_take_history(request, user_id), question, body)
+    # Counts and timings only: the transcript text never goes in the log.
+    logger.info(
+        "Transcribed %s s of audio for %s: %d words, %s, take %s",
+        body["duration_seconds"],
+        user_id,
+        len(body["words"]),
+        "charged" if billing is not None and body["words"] else "not charged",
+        body.get("take_id") or "not saved",
+    )
     return body
 
 

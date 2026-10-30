@@ -110,6 +110,10 @@ export interface paths {
          *     time left, checked before Deepgram is called (otherwise 402). A transcript with words
          *     then uses one free transcription, or deducts its length (rounded up to a second) from
          *     paid time, never below zero. A transcript with no words is free.
+         *
+         *     Each user runs one transcription at a time (another while one runs: 409) and at most a
+         *     set number each clock hour, 30 by default (over it: 429). Both are checked before
+         *     Deepgram is called; a refused audio type doesn't count towards the hour.
          */
         post: operations["createTranscription"];
         delete?: never;
@@ -704,7 +708,7 @@ export interface components {
          * @example validation_error
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
+        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
         /**
          * @example {
          *       "field": "text",
@@ -1098,6 +1102,21 @@ export interface operations {
                 };
             };
             404: components["responses"]["QuestionNotFound"];
+            /** @description Another transcription of this user's is still running. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "transcription_in_progress",
+                     *       "detail": "Your other recording is still being transcribed. Wait for it to finish."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description The body is larger than 25 MB. */
             413: {
                 headers: {
@@ -1123,6 +1142,21 @@ export interface operations {
                      * @example {
                      *       "code": "unsupported_audio_type",
                      *       "detail": "Unsupported audio type. Send audio/webm, audio/ogg, audio/mp4, audio/wav or audio/mpeg."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The user has made this hour's maximum number of transcriptions. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "rate_limited",
+                     *       "detail": "You've made a lot of recordings this hour. Try again in a few minutes."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];

@@ -13,7 +13,7 @@ Live at https://umless.in (Docker: nginx gateway, FastAPI backend, static fronte
 | Requirements and acceptance criteria | `docs/prd.md` |
 | API contract (source of truth) | `docs/api/openapi.yaml` |
 | Data rules (questions file, transcript and summary fields) | `docs/data-model.md` |
-| Architecture | `docs/adr/0001-architecture.md` (backend, overall), `docs/adr/0002-frontend-architecture.md` (frontend requests, errors, loading) |
+| Architecture | `docs/adr/0001-architecture.md` (backend, overall), `docs/adr/0002-frontend-architecture.md` (frontend requests, errors, loading), `docs/adr/0006-redis-limits.md` (Redis) |
 | Screens, flows, tokens, wireframe | `docs/design/` |
 | Roadmaps | `docs/roadmap/` |
 | Hand-runnable requests | `docs/api/requests.http` |
@@ -29,6 +29,9 @@ backend/            FastAPI (Python 3.12), pytest
   app/questions/    domain.py (text rules), models.py (request validation), repository.py (JSON file), router.py
   app/transcription/ Transcriber interface, deepgram.py, fake.py, text.py (pause dots), router.py
   app/summary.py    filler flags, pauses, summary for the 200 body
+  app/log.py        queue logging (QueueHandler + listener thread to stdout), started by the lifespan; UMLESS_LOG_LEVEL
+  app/limits.py     transcription limits: one at a time and 30/hour per user, Redis or in memory (ADR 0006)
+redis/              Redis service (compose + redis.conf), for the transcription limits; password in redis/.env
 frontend/           React 19 + TypeScript + Vite 6, Vitest, Playwright (layers: ADR 0005; imports only go down)
   src/app/          main.tsx, App (access check + layout), routes.ts (route table), access.ts, layouts/, session/ClerkSession
   src/pages/        one thin component per route
@@ -58,7 +61,7 @@ Git Bash on Windows. The backend venv is the Windows one; WSL uses `.venv/Script
 
 Run without a Deepgram key: set `UMLESS_TRANSCRIBER=fake`. The real key goes in `backend/.env` (see `backend/.env.example`). `pytest --run-live` makes one real Deepgram call.
 
-On the Oracle server there is no Node or Python on the host: run checks in containers (`node:22-alpine` for the frontend, `python:3.12-slim` for the backend, `mcr.microsoft.com/playwright:v1.64.1-noble` for e2e with `UMLESS_PYTHON` pointing at a venv inside it), then `sudo chown -R ubuntu:ubuntu` what they wrote. Deploy with `sg docker -c 'docker compose up -d --build <service>'` in `deploy/`, then `docker compose restart nginx`. MySQL tests need `UMLESS_TEST_DATABASE_URL` pointing at a throwaway database (every table is dropped): a temporary `mysql:8.4` container works.
+On the Oracle server there is no Node or Python on the host: run checks in containers (`node:22-alpine` for the frontend, `python:3.12-slim` for the backend, `mcr.microsoft.com/playwright:v1.64.1-noble` for e2e with `UMLESS_PYTHON` pointing at a venv inside it), then `sudo chown -R ubuntu:ubuntu` what they wrote. Deploy with `sg docker -c 'docker compose up -d --build <service>'` in `deploy/`, then `docker compose restart nginx`. MySQL tests need `UMLESS_TEST_DATABASE_URL` pointing at a throwaway database (every table is dropped): a temporary `mysql:8.4` container works. Redis tests need `UMLESS_TEST_REDIS_URL` (a temporary `redis:7.4-alpine` container). `backend/.env` on the server has `DB_HOST`, so importing the app there needs `REDIS_URL` set too.
 
 Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks during development used 8765 and 5174. Never test against 8000 with real data: point `UMLESS_DATA_FILE` at a scratch file and use another port.
 
@@ -72,6 +75,7 @@ Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks
 - **Pause dots** use the raw gap between words: `floor(gap + 0.001)` dots. The same rule drives `text`, `pause_count`, `longest_pause_seconds` and the frontend's highlighting (`summaryText.ts`). Change it everywhere or nowhere.
 - **Fillers** are exactly `um`, `uh`, `mhmm`. Deepgram's uh-huh, uh-uh, mm-mm and nuh-uh are yes/no answers and count as ordinary words.
 - **Styling:** plain CSS with tokens from `src/shared/theme/tokens.css` (the only file with colour values; light, dark and system). Build screens from `@/shared/ui` primitives (`ui-` classes, style guide at `/_ui` in dev); `app/index.css` is the old global layer, removed in Phase 6. Where `flows.md` and the wireframe disagree on wording, the wireframe wins.
+- **Logging:** use `logging.getLogger(__name__)`; `app/log.py` puts every record on a queue, so log calls never block a request. Never log transcript text or keys. Tests build `Settings()` directly (no `log_level`), which leaves logging alone so `caplog` works.
 - **Questions file** `backend/data/questions.json` is git-ignored. A corrupt file stops startup and is never overwritten.
 
 ## Working with the user

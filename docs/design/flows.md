@@ -99,6 +99,8 @@ There is no login in v1, so there is no "unauthorized" state. When accounts arri
 | E22 | Keyboard-only or screen-reader user | all | Every action reachable by Tab; Space toggles recording on the practice screen; state changes announced via `aria-live` | — |
 | E23 | Reduced motion preferred | recording | No pulsing dot or animated meter; a static "Recording" badge instead | — |
 | E24 | Very many questions (100+) | `questions` | Plain scrolling list, plus a filter field once there are more than 10 | — |
+| E25 | A second transcription while one is still running (409), e.g. another tab | transcribing | Same screen: "Another recording is still being transcribed. Wait for it to finish, then try again." The recording is kept | **Try again**, **Download audio** |
+| E26 | Over the hourly transcription cap, 30 by default (429) | transcribing | Same screen: "You've made a lot of recordings this hour. Take a short break, then try again." The recording is kept | **Try again**, **Download audio** |
 
 ## F5–F9: the v2 app (ADR 0005)
 

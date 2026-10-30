@@ -8,3 +8,4 @@ cryptography==50.0.2
 alembic==1.20.1
 PyJWT[crypto]==2.15.1
 oci==2.189.0
+redis==6.2.0

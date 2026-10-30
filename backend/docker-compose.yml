@@ -22,6 +22,8 @@ services:
       UMLESS_DATA_FILE: data/questions.json
     volumes:
       - questions-data:/app/data
+    # Transcription limits live in Redis (REDIS_URL, redis/). No depends_on, so this file still
+    # runs on its own: the backend connects on first use and fails open while Redis is down.
     # Raise if transcriptions of long recordings get slow; one uvicorn process uses one CPU.
     mem_limit: 512m
     cpus: 1.0

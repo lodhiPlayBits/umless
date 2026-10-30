@@ -37,6 +37,20 @@ describe('transcribeFailure', () => {
     })
   })
 
+  it('maps 409 transcription_in_progress to "still being transcribed", retryable', () => {
+    expect(transcribeFailure(err(409, 'transcription_in_progress'))).toMatchObject({
+      title: 'Another recording is still being transcribed',
+      canRetry: true,
+    })
+  })
+
+  it('maps 429 rate_limited to "a lot of recordings this hour", retryable', () => {
+    expect(transcribeFailure(err(429, 'rate_limited'))).toMatchObject({
+      title: "You've made a lot of recordings this hour",
+      canRetry: true,
+    })
+  })
+
   it('treats a non-ApiError as unreachable', () => {
     expect(transcribeFailure(new TypeError('boom')).title).toBe("Can't reach the umless server")
   })

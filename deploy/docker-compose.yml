@@ -8,6 +8,7 @@ name: umless
 include:
   - ../backend/docker-compose.yml
   - ../frontend/docker-compose.yml
+  - ../redis/docker-compose.yml
 
 services:
   nginx:

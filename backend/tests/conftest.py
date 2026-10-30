@@ -91,7 +91,9 @@ def contract_schema(tmp_path_factory):
     Use with: schema = schemathesis.pytest.from_fixture("contract_schema").
     """
     data_file = tmp_path_factory.mktemp("contract") / "q.json"
-    app = require_sign_in(create_app(Settings(transcriber="fake", data_file=data_file)))
+    # A high hourly cap, so fuzzed transcriptions never hit 429 (it has its own tests).
+    settings = Settings(transcriber="fake", data_file=data_file, transcriptions_per_hour=10**9)
+    app = require_sign_in(create_app(settings))
     repository = JsonFileQuestionRepository(data_file)
     app.dependency_overrides[get_question_repository] = lambda: repository
     app.state.questions = repository  # createTranscription saving a take reads it directly

@@ -86,6 +86,20 @@ export function transcribeFailure(error: unknown): TranscribeFailure {
       needsTime: true,
     }
   }
+  if (code === 'transcription_in_progress') {
+    return {
+      title: 'Another recording is still being transcribed',
+      detail: 'Wait for it to finish (it may be in another tab), then try again. This recording is safe.',
+      canRetry: true,
+    }
+  }
+  if (code === 'rate_limited') {
+    return {
+      title: "You've made a lot of recordings this hour",
+      detail: 'Take a short break, then try again. This recording is safe in this tab.',
+      canRetry: true,
+    }
+  }
   if (code === 'audio_too_large') {
     return { title: 'This recording is over 25 MB', detail: 'Record a shorter answer.', canRetry: false }
   }

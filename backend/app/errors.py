@@ -28,6 +28,8 @@ ErrorCode = Literal[
     "unsupported_audio_type",
     "transcription_failed",
     "transcription_unavailable",
+    "transcription_in_progress",
+    "rate_limited",
     "storage_unavailable",
     "invalid_host",
     "unauthorized",
