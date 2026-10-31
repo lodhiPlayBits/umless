@@ -134,6 +134,25 @@ Order: 1 first (live money was at risk). Phase 0 is deferred to just before laun
     - SonarCloud import (check the keys; Automatic Analysis off);
     - `docker login bom.ocir.io` on the server.
 - 2026-10-31: The server is logged in to OCIR (`Login Succeeded`) as `bmej3eov9wnf/Default/gauravlodhi983@gmail.com`; this tenancy needs the `Default` domain in the username. Secrets `OCIR_USERNAME`, `OCIR_TOKEN` and `SONAR_TOKEN` are set on GitHub.
+- 2026-10-31: **Phase 6 reworked into full CI/CD** (your request, modelled on your AWS pipeline).
+  - Stages:
+    - tests;
+    - Trivy filesystem scans;
+    - SonarCloud;
+    - ARM image builds of changed images only, with a Trivy image gate, pushed to OCIR as `:<sha7>` on `main`;
+    - the `ci-passed` single required check;
+    - **deploy on merge to `main`** over SSH;
+    - a public **smoke test**;
+    - **rollback** plus a revert PR when the smoke test fails.
+  - Version tags are no longer used.
+  - `deploy.sh <sha>` restarts only the services whose image changed.
+  - `deploy/ci-deploy.sh` is the SSH forced command (only `deploy <sha>`, logged).
+  - `deploy/setup-ci-access.sh` makes the read-only GitHub deploy key and CI's restricted key.
+  - Checked:
+    - shellcheck is clean;
+    - the smoke test passes against the live site (10/10);
+    - `ci-deploy.sh` refuses everything but `deploy <hex sha>` and passes on deploy.sh's exit code (tested with a fake deploy). That caught 2 bugs of mine: tee hid the exit code, then `set -e` skipped saving it.
+  - **Left (you):** run `setup-ci-access.sh`; add the deploy key, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` and the variable; branch protection on `ci-passed`; first merge to `main`.
 
 ## Phases
 

@@ -78,7 +78,7 @@ sg docker -c 'docker compose up -d --build'
 sg docker -c 'sh init-letsencrypt.sh'
 ```
 
-`--build` builds from the checkout, which is fine to get running again. Afterwards, `deploy.sh <latest tag>` swaps in the exact images CI built.
+`--build` builds from the checkout, which is fine to get running again. Afterwards, run `deploy/setup-ci-access.sh` (a new VM has new host keys: update the `DEPLOY_KNOWN_HOSTS` and `DEPLOY_SSH_KEY` secrets, and the GitHub deploy key), then `deploy.sh <latest main sha>` swaps in the exact images CI built.
 
 The stack first starts with a self-signed certificate; `init-letsencrypt.sh` replaces it with a Let's Encrypt one. The backend runs its database migrations on start.
 

@@ -1,26 +1,36 @@
-# Every push to main/develop and every pull request: backend tests (with real MySQL and Redis,
-# so nothing skips), the backup service's tests, frontend lint/tests/build, the e2e flows and a
-# SonarCloud analysis. A version tag (v1.2.0) also builds the four images for the server (ARM)
-# and pushes them to OCIR, where deploy/deploy.sh pulls them (docs/runbooks/deploys.md).
-# Branch protection on main and develop requires the test jobs to pass.
+# CI/CD for umless.in (docs/runbooks/deploys.md).
 #
-# GitHub settings: secrets OCIR_USERNAME, OCIR_TOKEN, SONAR_TOKEN; variable VITE_CLERK_PUBLISHABLE_KEY.
+#   every PR and push:  test (backend, frontend, e2e) + scan (Trivy) + sonar + build (ARM images, Trivy gate)
+#   push to main only:  images pushed to OCIR → deploy over SSH → smoke test from outside
+#                       → if the smoke test fails: roll the server back + open a revert PR
+#
+# GitHub settings → Secrets: OCIR_USERNAME, OCIR_TOKEN, SONAR_TOKEN, DEPLOY_SSH_KEY,
+# DEPLOY_KNOWN_HOSTS. Variables: VITE_CLERK_PUBLISHABLE_KEY. Branch protection requires `ci-passed`.
 name: CI
 
 on:
-  push:
-    branches: [main, develop]
-    tags: ["v*"]
   pull_request:
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  # A newer push replaces a PR's run; never cancel a run on main (it may be deploying).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # OCIR, Mumbai (ap-mumbai-1 = bom), tenancy namespace bmej3eov9wnf.
+  REGISTRY: bom.ocir.io/bmej3eov9wnf/umless
+  DEPLOY_HOST: umless.in
+  DEPLOY_USER: ubuntu
+  PUBLIC_URL: https://umless.in
+
 jobs:
+  # ── Stage 1: tests ────────────────────────────────────────────────────────────────────────
   backend:
     runs-on: ubuntu-24.04
     services:
@@ -62,7 +72,7 @@ jobs:
         with:
           name: backend-coverage
           path: backend/coverage.xml
-          retention-days: 1
+          retention-days: 7
 
   frontend:
     runs-on: ubuntu-24.04
@@ -86,7 +96,7 @@ jobs:
         with:
           name: frontend-coverage
           path: frontend/coverage/lcov.info
-          retention-days: 1
+          retention-days: 7
 
   e2e:
     runs-on: ubuntu-24.04
@@ -118,9 +128,47 @@ jobs:
           path: frontend/test-results/
           retention-days: 7
 
+  # ── Stage 2: filesystem security scans ────────────────────────────────────────────────────
+  scan:
+    name: scan (${{ matrix.path }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        path: [backend, frontend, backup, deploy/nginx, redis]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan (report)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: ./${{ matrix.path }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+          format: table
+          output: trivy-fs.txt
+      - name: Publish scan summary
+        if: always()
+        run: |
+          {
+            echo "## Trivy filesystem scan: ${{ matrix.path }}"
+            echo '```'
+            if [ -f trivy-fs.txt ]; then cat trivy-fs.txt; else echo "No report generated."; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Trivy filesystem gate (fail on fixable CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: ./${{ matrix.path }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+  # ── Stage 3: SonarCloud ───────────────────────────────────────────────────────────────────
   sonar:
-    # Pull requests from forks get no secrets; skip rather than fail there.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [backend, frontend]
     runs-on: ubuntu-24.04
     steps:
@@ -141,16 +189,13 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
 
-  images:
-    # Only for version tags, and only once every test job has passed.
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [backend, frontend, e2e]
+  # ── Stage 4: build and scan images on every run; push to OCIR only on main ────────────────
+  build-push:
+    name: build-push (${{ matrix.image }})
+    needs: [backend, frontend, e2e, scan]
     runs-on: ubuntu-24.04
-    env:
-      # OCIR in Mumbai (ap-mumbai-1 = bom), tenancy namespace bmej3eov9wnf.
-      REGISTRY: bom.ocir.io/bmej3eov9wnf/umless
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - image: backend
@@ -161,28 +206,206 @@ jobs:
             context: deploy/nginx
           - image: backup
             context: backup
+    env:
+      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
-      # The server is an Ampere (ARM) VM: build linux/arm64 under emulation (private repo,
-      # so GitHub's native ARM runners aren't free).
-      - uses: docker/setup-qemu-action@v3
         with:
-          platforms: arm64
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+          fetch-depth: 0  # full history, to diff against the previous commit
+
+      - name: Log in to OCIR
+        if: env.PUSH == 'true'
+        uses: docker/login-action@v3
         with:
           registry: bom.ocir.io
           username: ${{ secrets.OCIR_USERNAME }}
           password: ${{ secrets.OCIR_TOKEN }}
-      - uses: docker/build-push-action@v6
+
+      # Unchanged images are re-tagged instead of rebuilt: same digest, so deploy.sh doesn't
+      # restart that container.
+      - name: Detect changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          PATHS=("${{ matrix.context }}/" ".github/workflows/")
+          BUILD=true
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]] || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            REASON="no usable base commit: building"
+          elif git diff --quiet "$BASE" "$GITHUB_SHA" -- "${PATHS[@]}"; then
+            BUILD=false
+            REASON="no changes in ${PATHS[*]} since ${BASE::7}"
+          else
+            REASON="changed since ${BASE::7}: $(git diff --name-only "$BASE" "$GITHUB_SHA" -- "${PATHS[@]}" | head -5 | tr '\n' ' ')"
+          fi
+          # On main, re-tagging needs the previous image in OCIR.
+          if [[ "$BUILD" == "false" && "$PUSH" == "true" ]] \
+             && ! docker buildx imagetools inspect "$REGISTRY/${{ matrix.image }}:${BASE::7}" >/dev/null 2>&1; then
+            BUILD=true
+            REASON="no changes, but ${{ matrix.image }}:${BASE::7} isn't in OCIR: building"
+          fi
+          echo "${{ matrix.image }}: build=$BUILD ($REASON)"
+          { echo "### ${{ matrix.image }}: build=$BUILD"; echo "$REASON"; } >> "$GITHUB_STEP_SUMMARY"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "base_tag=${BASE::7}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # The server is an Ampere (ARM) VM; private repo, so emulated rather than native ARM runners.
+      - uses: docker/setup-qemu-action@v3
+        if: steps.changes.outputs.build == 'true'
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (linux/arm64)
+        if: steps.changes.outputs.build == 'true'
+        uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           platforms: linux/arm64
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ matrix.image }}:${{ github.ref_name }}
-            ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ github.sha }}
+          load: true  # into the runner's Docker, for Trivy
+          tags: ${{ env.REGISTRY }}/${{ matrix.image }}:${{ steps.changes.outputs.tag }}
           build-args: |
             CLERK_PUBLISHABLE_KEY=${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+      - name: Trivy image scan (report)
+        if: steps.changes.outputs.build == 'true'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ matrix.image }}:${{ steps.changes.outputs.tag }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"
+          format: table
+          output: trivy-image.txt
+      - name: Publish image scan summary
+        if: always() && steps.changes.outputs.build == 'true'
+        run: |
+          {
+            echo "## Trivy image scan: ${{ matrix.image }}"
+            echo '```'
+            if [ -f trivy-image.txt ]; then cat trivy-image.txt; else echo "No report generated."; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Trivy image gate (fail on fixable CRITICAL)
+        if: steps.changes.outputs.build == 'true'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ matrix.image }}:${{ steps.changes.outputs.tag }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+      - name: Push image to OCIR
+        if: env.PUSH == 'true' && steps.changes.outputs.build == 'true'
+        run: docker push "$REGISTRY/${{ matrix.image }}:${{ steps.changes.outputs.tag }}"
+
+      - name: Reuse previous image (re-tag in OCIR, no rebuild)
+        if: env.PUSH == 'true' && steps.changes.outputs.build == 'false'
+        run: |
+          docker buildx imagetools create \
+            --tag "$REGISTRY/${{ matrix.image }}:${{ steps.changes.outputs.tag }}" \
+            "$REGISTRY/${{ matrix.image }}:${{ steps.changes.outputs.base_tag }}"
+
+  # ── The one required check for branch protection ──────────────────────────────────────────
+  ci-passed:
+    if: always()
+    needs: [backend, frontend, e2e, scan, sonar, build-push]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Verify all stages passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "CI failed: a required stage finished with: $result ($RESULTS)"
+              exit 1
+            fi
+          done
+          echo "All required stages passed."
+
+  # ── Stage 5: deploy, only on a push to main (a merged PR) ─────────────────────────────────
+  deploy:
+    needs: ci-passed
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy over SSH (deploy.sh health-checks and rolls back on the server)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: bash .github/scripts/remote-deploy.sh "${GITHUB_SHA::7}"
+
+  # ── Stage 6: smoke test from outside (internet → DNS → TLS → nginx → services) ────────────
+  smoke-test:
+    needs: deploy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke test public endpoints
+        run: bash .github/scripts/smoke-test.sh "$PUBLIC_URL"
+
+  # ── Stage 7: only if the smoke test fails ─────────────────────────────────────────────────
+  #   1. put the server back on the previous main commit
+  #   2. open a revert PR for a human to review (never pushes to main)
+  rollback:
+    needs: [deploy, smoke-test]
+    if: failure() && needs.smoke-test.result == 'failure'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write       # push the revert branch
+      pull-requests: write  # open the revert PR
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Roll the server back to the previous main commit
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          PREV_SHA: ${{ github.event.before }}
+        run: |
+          echo "Rolling back from ${GITHUB_SHA::7} to ${PREV_SHA::7}"
+          bash .github/scripts/remote-deploy.sh "${PREV_SHA::7}"
+      - name: Open revert PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREV_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          SHORT="${GITHUB_SHA::7}"
+          BRANCH="revert/$SHORT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH" "$GITHUB_SHA"
+          # A merge commit needs -m 1 (keep main's side); a squash or plain commit doesn't.
+          if [ "$(git rev-list --parents -n 1 "$GITHUB_SHA" | wc -w)" -gt 2 ]; then
+            git revert --no-edit -m 1 "$GITHUB_SHA"
+          else
+            git revert --no-edit "$GITHUB_SHA"
+          fi
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "Revert $SHORT: post-deploy smoke test failed" \
+            --body "Automated revert opened by run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+
+          The public smoke test failed after deploying \`$SHORT\`, so the server was rolled back to \`${PREV_SHA::7}\`.
+
+          **Review before merging.** If the failure wasn't caused by this change (network, DNS, certificate), close this PR instead."
