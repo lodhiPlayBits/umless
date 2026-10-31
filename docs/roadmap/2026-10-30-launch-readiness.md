@@ -161,6 +161,14 @@ Order: 1 first (live money was at risk). Phase 0 is deferred to just before laun
     - `apk upgrade` in the gateway and frontend images;
     - MySQL Shell and `gosu` deleted from the backup image.
   - Rebuilt and rescanned: no fixable CRITICALs in any image; the 5 filesystem scans pass. The gateway config is valid, the frontend serves, and the backup still has `mysqldump` 8.4.13 and the OCI SDK.
+- 2026-10-31: **The backup image is out of CI/CD** (your call).
+  - It was the slowest image (1.78 GB on `mysql:8.4` under ARM emulation), rarely changes, and doesn't serve users.
+  - CI still runs its tests and the Trivy filesystem scan of `backup/`.
+  - `deploy.sh` and `rollback.sh` now handle backend, frontend and gateway only. The backup is rebuilt on the server when `backup/` changes (`docs/runbooks/deploys.md`).
+- 2026-10-31: **Redis is in CI/CD** (your request).
+  - `redis/Dockerfile`: `redis:7.4-alpine` + `apk upgrade` + `redis.conf` baked in; the password still comes from `redis/.env` at start. Compose builds `umless-redis` and no longer mounts the config.
+  - CI builds and Trivy-gates it and pushes it to OCIR; `deploy.sh`/`rollback.sh` handle it, restarting it only when its image changed (data stays on the volume; the backend fails open meanwhile).
+  - Tested: auth enforced, config applied (128 MB, volatile-lru, AOF, FLUSHALL disabled), Trivy gate clean.
 
 ## Phases
 

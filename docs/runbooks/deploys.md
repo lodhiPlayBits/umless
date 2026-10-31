@@ -17,7 +17,7 @@ feature branch → PR to develop (CI) → merge → PR develop → main (CI) →
 | 1 | `e2e` | every PR/push | Playwright flows F1–F4 and accessibility; traces on failure |
 | 2 | `scan (…)` | every PR/push | Trivy filesystem scan of `backend`, `frontend`, `backup`, `deploy/nginx`, `redis`; **fails on a fixable CRITICAL** |
 | 3 | `sonar` | every PR/push | SonarCloud with backend + frontend coverage (`sonar-project.properties`) |
-| 4 | `build-push (…)` | every PR/push | builds the 4 images for `linux/arm64` (emulated) **only if their folder changed**, Trivy image scan, **fails on a fixable CRITICAL**. On `main` only: pushes `bom.ocir.io/bmej3eov9wnf/umless/<image>:<7-char sha>`; an unchanged image gets the new tag without a rebuild (same digest, so its container isn't restarted) |
+| 4 | `build-push (…)` | every PR/push | builds the `backend`, `frontend`, `gateway` and `redis` images for `linux/arm64` (emulated) **only if their folder changed**, Trivy image scan, **fails on a fixable CRITICAL**. On `main` only: pushes `bom.ocir.io/bmej3eov9wnf/umless/<image>:<7-char sha>`; an unchanged image gets the new tag without a rebuild (same digest, so its container isn't restarted) |
 | — | `ci-passed` | always | the **one required check**: every stage above succeeded |
 | 5 | `deploy` | push to `main` | SSH to the server: `deploy <sha>` → `deploy/deploy.sh` |
 | 6 | `smoke-test` | after deploy | `.github/scripts/smoke-test.sh https://umless.in` from GitHub: home page and bundle, `/api/health`, sign-in enforced on 3 API routes, http→https, www→bare, HSTS, certificate ≥ 7 days |
@@ -68,6 +68,14 @@ The OCI security list must allow SSH (22) from the internet: GitHub's runners ha
 - Work on a branch, PR to `develop`, merge when `ci-passed` is green.
 - Release: PR `develop` → `main`, merge. The deploy runs by itself (≈ 20–30 min with ARM emulation; less when only some images changed). Watch it under Actions.
 - If CI rolls back: the site is on the previous version. Read the failed smoke test and the revert PR, then either merge the revert or fix forward with a new PR. Close the revert PR if the cause was outside the code (network, DNS, certificate).
+
+## The backup service (built on the server)
+
+CI doesn't build the backup image: it rarely changes, isn't part of serving users, and was the slowest image (1.78 GB under ARM emulation). CI still runs its tests and the Trivy scan of `backup/`. When a merged change touches `backup/`, rebuild it on the server **after** that merge's deploy has finished (the checkout is then at that commit):
+```bash
+cd ~/umless/umless/deploy && sg docker -c 'docker compose build backup && docker compose up -d --no-deps backup'
+sg docker -c 'docker logs --tail 3 umless-backup'   # expect "Uploaded …" (it backs up on start)
+```
 
 ## By hand (emergencies)
 

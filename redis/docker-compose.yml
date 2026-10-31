@@ -5,7 +5,9 @@ name: umless
 
 services:
   redis:
-    image: redis:7.4-alpine
+    # Built by CI from redis/Dockerfile and pushed to OCIR; deploy.sh pulls it (docs/runbooks/deploys.md).
+    build: .
+    image: umless-redis
     container_name: umless-redis
     # REDIS_PASSWORD stays in the git-ignored redis/.env. Not the repo root's .env: that
     # holds the backend's secrets, which Redis has no use for.
@@ -17,7 +19,7 @@ services:
       sh -c 'test -n "$$REDIS_PASSWORD" || { echo "set REDIS_PASSWORD in .env" >&2; exit 1; };
       exec redis-server /usr/local/etc/redis/redis.conf --requirepass "$$REDIS_PASSWORD"'
     volumes:
-      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+      # redis.conf is in the image (redis/Dockerfile).
       - redis-data:/data
     # Keep in step with maxmemory in redis.conf (leave headroom for the AOF rewrite fork).
     mem_limit: 256m

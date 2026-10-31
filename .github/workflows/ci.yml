@@ -1,6 +1,8 @@
 # CI/CD for umless.in (docs/runbooks/deploys.md).
 #
 #   every PR and push:  test (backend, frontend, e2e) + scan (Trivy) + sonar + build (ARM images, Trivy gate)
+#                       (not the backup image: it rarely changes and is built on the server;
+#                       its tests and Trivy filesystem scan still run here)
 #   push to main only:  images pushed to OCIR → deploy over SSH → smoke test from outside
 #                       → if the smoke test fails: roll the server back + open a revert PR
 #
@@ -204,8 +206,8 @@ jobs:
             context: frontend
           - image: gateway
             context: deploy/nginx
-          - image: backup
-            context: backup
+          - image: redis
+            context: redis
     env:
       PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:

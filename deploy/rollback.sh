@@ -12,14 +12,14 @@ stamp=${1:-}
 [ -n "$stamp" ] || { echo "usage: rollback.sh <stamp>"; docker images --format '{{.Tag}}' umless-backend | grep '^rollback-' | sed 's/^rollback-//'; exit 2; }
 . ./.env
 
-for image in umless-backend umless-frontend umless-gateway umless-backup; do
+for image in umless-backend umless-frontend umless-gateway umless-redis; do
     if docker image inspect "$image:rollback-$stamp" >/dev/null 2>&1; then
         docker tag "$image:rollback-$stamp" "$image:latest"
     else
         echo "No $image:rollback-$stamp; leaving $image as it is." >&2
     fi
 done
-docker compose up -d --no-build --no-deps --force-recreate backend frontend backup
+docker compose up -d --no-build --no-deps --force-recreate redis backend frontend
 i=0
 until [ "$(docker inspect -f '{{.State.Health.Status}}' umless-backend)" = healthy ]; do
     i=$((i + 1)); [ "$i" -lt 60 ] || { echo "The backend isn't healthy after the rollback either: check docker logs umless-backend" >&2; exit 1; }

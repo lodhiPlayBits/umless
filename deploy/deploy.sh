@@ -34,7 +34,8 @@ stamp=$(date -u +%Y%m%d-%H%M%S)
 registry=${UMLESS_REGISTRY:-bom.ocir.io/bmej3eov9wnf/umless}
 # OCIR repository:local image name:container:compose service. The compose files use the local
 # names, so CI's images are pulled, then tagged with those.
-services="backend:umless-backend:umless-backend:backend frontend:umless-frontend:umless-frontend:frontend gateway:umless-gateway:umless-nginx:nginx backup:umless-backup:umless-backup:backup"
+# The backup service isn't here: CI doesn't build it (it rarely changes); see docs/runbooks/deploys.md.
+services="backend:umless-backend:umless-backend:backend frontend:umless-frontend:umless-frontend:frontend gateway:umless-gateway:umless-nginx:nginx redis:umless-redis:umless-redis:redis"
 field() { echo "$1" | cut -d: -f"$2"; }
 back() { cd .. && git checkout --quiet --detach "$previous"; }
 
@@ -72,7 +73,8 @@ for s in $services; do
 done
 
 echo "4/5 Start"
-# Only the changed services; certbot and redis keep running. The backend runs migrations on start.
+# Only the changed services; certbot and backup keep running. The backend runs migrations on start;
+# while redis restarts, the backend lets transcriptions through (ADR 0006) and its data stays on the volume.
 apps=$(echo "$changed" | tr ' ' '\n' | grep -vx nginx | grep . | tr '\n' ' ' || true)
 if [ -n "$apps" ]; then
     # shellcheck disable=SC2086  # one word per service
