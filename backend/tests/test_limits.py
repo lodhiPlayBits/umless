@@ -265,10 +265,13 @@ def test_a_bad_hourly_cap_is_refused(monkeypatch, value):
         Settings.from_env(env_files=())
 
 
-def test_with_redis_url_the_app_keeps_its_limits_in_redis(redis_client, tmp_path):
+def test_with_redis_url_the_app_keeps_its_limits_in_redis(tmp_path):
+    # Sync (TestClient), so it can't use the async redis_client fixture: it would never run.
     from fastapi.testclient import TestClient
 
-    url = os.environ["UMLESS_TEST_REDIS_URL"]
+    url = os.environ.get("UMLESS_TEST_REDIS_URL")
+    if not url:
+        pytest.skip("UMLESS_TEST_REDIS_URL is not set")
     transcriber = GatedTranscriber()
     transcriber.release.set()
     app = make_app(transcriber, data_file=tmp_path / "q.json", redis_url=url, transcriptions_per_hour=1)

@@ -27,11 +27,19 @@ FAKE_SECONDS = 4  # the fake transcript lasts 3.5 s, charged rounded up
 class FakeRazorpay(Razorpay):
     """Real signature checks, but orders are made up instead of created at Razorpay."""
 
-    def __init__(self, fail=False, captured=True):
+    def __init__(self, fail=False, captured=True, refund_fails=False):
         super().__init__("rzp_test_key", KEY_SECRET, WEBHOOK_SECRET)
         self.fail = fail
         self.captured = captured  # True, False, or an exception to raise
+        self.refund_fails = refund_fails
         self.orders = []
+        self.refunds = []
+
+    def refund(self, payment_id, amount_paise, notes):
+        if self.refund_fails:
+            raise RazorpayError("refund payment: HTTP 400 The balance is insufficient")
+        self.refunds.append((payment_id, amount_paise, notes))
+        return f"rfnd_{len(self.refunds):06d}"
 
     def payment_is_captured(self, payment_id, order_id, amount_paise, currency):
         if isinstance(self.captured, Exception):

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 # Every new account can transcribe this many answers free, of any length.
 FREE_TRANSCRIPTIONS = 3
+# An unused pack can be refunded this long after it was paid for (the published refund policy).
+REFUND_DAYS = 7
 
 
 @dataclass(frozen=True)

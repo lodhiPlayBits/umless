@@ -30,5 +30,10 @@ class TranscriptionError(Exception):
     """The audio could not be transcribed. Messages never include the API key."""
 
 
+class DeepgramAccountError(TranscriptionError):
+    """Deepgram refused our account (revoked key, no credit): every transcription fails until
+    someone fixes it, so it's logged at ERROR to alert, not WARNING."""
+
+
 class Transcriber(Protocol):
     async def transcribe(self, audio: bytes, content_type: str) -> Transcript: ...

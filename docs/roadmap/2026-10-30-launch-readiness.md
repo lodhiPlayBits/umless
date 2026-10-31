@@ -16,11 +16,11 @@ Owners: **You** = dashboards, accounts, DNS, legal wording (only you can do thes
 |---|---|---|---|
 | 0 | Secure and ship today's work | S | deferred to just before launch (2026-10-30) |
 | 1 | Payments can't lose money | S | done |
-| 2 | Backups you've actually restored | M | in-progress |
-| 3 | Know when it breaks | M | not-started |
-| 4 | Production sign-in (Clerk) | M | not-started |
+| 2 | Backups you've actually restored | M | done |
+| 3 | Know when it breaks | M | in-progress |
+| 4 | Production sign-in (Clerk) | M | in-progress (live; check left) |
 | 5 | Legal pages and deleting data | M | not-started |
-| 6 | Safe deploys (CI, tags, rollback) | M | not-started |
+| 6 | Safe deploys (CI, tags, rollback) | M | in-progress (built; your GitHub steps left) |
 | 7 | Hardening (CSP, free-tier abuse, Safari) | M | not-started |
 | 8 | Launch | S | not-started |
 
@@ -61,6 +61,69 @@ Order: 1 first (live money was at risk). Phase 0 is deferred to just before laun
   - **Restore test OK:** accounts 3/3, alembic_version 1/1, payment_orders 8/8, questions 2/2, takes 4/4.
   - Left: versioning on the transcripts bucket (step 4), `.env` files in a password manager (step 5), the recovery runbook (step 6).
 - 2026-10-31: **Phase 2, step 6 done:** `docs/runbooks/disaster-recovery.md`, rebuilding on a new VM (Ubuntu 24.04, Ampere A1) from GitHub, the six `.env` files, HeatWave or the dumps, with a checklist. Not yet rehearsed. Left: steps 4 and 5 (you).
+- 2026-10-31: **Phase 2 done.**
+  - You: versioning is on for the transcripts bucket, and the six `.env` files are in the password manager.
+  - Today's work is committed and pushed (`73b522b` on `origin/main`).
+- 2026-10-31: **Phase 3, step 3 code done (not deployed).**
+  - Deepgram's 401, 402 and 403 (revoked key, no credit, no permission) raise `DeepgramAccountError`, and the route logs it at ERROR; other failures stay at WARNING. Users still see 502 `transcription_failed`.
+  - Tests: client and route levels.
+  - Also fixed `test_with_redis_url_the_app_keeps_its_limits_in_redis`: it failed instead of skipping without `UMLESS_TEST_REDIS_URL`.
+  - Results: 537 passed without Redis, 542 with it.
+- 2026-10-31: **`www.umless.in` fix ready (found while setting up UptimeRobot).**
+  - The problem: `www` resolved to the server, but the certificate covered only `umless.in`, so `https://www.umless.in` showed a certificate warning.
+  - The fix:
+    - nginx redirects `www` (HTTP and HTTPS) and plain HTTP straight to `https://umless.in`;
+    - `init-letsencrypt.sh` adds `www` to the same certificate (`--cert-name --expand`) when its DNS exists, and builds only the gateway image. Its old `up --build nginx` also rebuilt the backend and frontend images.
+  - Tested in a throwaway gateway: the config is valid, the redirects keep path and query, ACME still reaches certbot, and the `www` redirect sends HSTS.
+- 2026-10-31: **`www` fix deployed.**
+  - The certificate now covers `umless.in` and `www.umless.in` (expires 2027-01-28; certbot renews automatically).
+  - Checked from outside: all `www` and HTTP variants answer 301 to `https://umless.in`.
+- 2026-10-31: **Phase 4 started: Clerk production keys received, not applied.**
+  - `clerk.umless.in` doesn't resolve yet, so switching now would break sign-in.
+  - Waiting on you:
+    - Clerk DNS records verified;
+    - the secret key rolled (it was posted in chat; umless doesn't use it);
+    - Google OAuth credentials;
+    - bot protection.
+  - Then one coordinated deploy: Redis, both keys, `CLERK_AUTHORIZED_PARTIES=https://umless.in`, backend and frontend rebuilt, and a dry-run-first SQL move of the 3 existing accounts to their new user ids.
+- 2026-10-31: **Phase 4: DNS done; account-move script built.**
+  - The 5 Clerk CNAMEs are at Hostinger, and checked live through public DNS (1.1.1.1).
+  - Waiting on Clerk's Verify Records and its SSL certificates.
+  - Transcripts in the bucket are stored under `users/<user id>/takes/`, so a plain SQL move would lose them. `app/admin/move_user.py OLD NEW [--apply]` (dry run by default) does the whole move:
+    - questions, takes and paid orders;
+    - transcripts: copied first, old copies deleted only after the database commit;
+    - the balance, merged with the fresh account from the first sign-in, without extra free transcriptions;
+    - refused if the new id already has data.
+  - Tests: 8 against a real MySQL 8.4. The full suite passes with MySQL (573).
+- 2026-10-30: **Clerk production switch deployed.**
+  - Before: a backup (`umless-20261030T204340Z`), and images tagged `rollback-20261030-2043`.
+  - Redis started; `REDIS_URL` in `backend/.env`.
+  - `pk_live_` in `backend/.env` and `frontend/.env`; backend and frontend rebuilt.
+  - Checked:
+    - the bundle ships `pk_live_`;
+    - the backend logs "Transcription limits in Redis";
+    - `/api/questions` without a session → 401.
+  - Account move: `user_3LBFroY5BX7twlMsoiyLt5aZOb8` (dev, gauravlodhi983) → `user_3LQjZfsQZCodEryE2FcKqdnTQoB` (production). Moved 1 question, 1 take and its transcript, 4 orders, and the balance (3 free + 7200 s).
+    - The id as first given had a zero where Clerk has a capital O. The script refused it ("no data"), which caught the mix-up.
+  - Not moved, by your choice:
+    - `user_3LBFyJIIrtFa7G1DJieqxTxMQEw`: 1 question, 3 takes, 2 paid orders, 7200 s;
+    - `user_3LPKHw7GOnBpmJmJfOPxzT6wf2h`: 1 paid order, 3600 s.
+
+    Their data stays in the database; move it with the same script if those people sign in on production.
+  - Phase 0's Redis and logging went out in this deploy. Deepgram key rotation is still open.
+- 2026-10-31: **Self-serve refunds done** (`docs/roadmap/2026-10-31-self-serve-refunds.md`): deployed and tested live (a ₹40 refund was processed by Razorpay's webhook in 34 s).
+- 2026-10-31: **Phase 6 built.**
+  - `.github/workflows/ci.yml`:
+    - `backend`: real MySQL 8.4 + Redis 7.4, plus the backup tests;
+    - `frontend`: generated client up to date, lint, tests, build;
+    - `e2e`: Playwright, with traces on failure.
+  - `deploy/deploy.sh <tag>`: refuses a dirty checkout; backup → rollback tags → build → health check → **automatic rollback** on failure. `deploy/rollback.sh <stamp>` rolls back by hand.
+  - `docs/runbooks/deploys.md` covers the release flow, migrations that only add, and hotfixes. The e2e backend now blanks `REDIS_URL`, like the other production settings.
+  - Checked locally: shellcheck (info notes only); the workflow parses; e2e **86 passed**; backend 596 and frontend 470 earlier today.
+  - **Left (you):**
+    - push, so CI runs once;
+    - branch protection on `main`/`develop` requiring `backend`, `frontend` and `e2e`;
+    - the first tagged deploy with the script.
 
 ## Phases
 

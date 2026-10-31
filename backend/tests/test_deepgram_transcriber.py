@@ -7,6 +7,7 @@ import pytest
 
 from app.config import DEEPGRAM_MODEL, DEEPGRAM_PARAMS, Settings
 from app.transcription import (
+    DeepgramAccountError,
     DeepgramTranscriber,
     FakeTranscriber,
     Transcript,
@@ -183,6 +184,27 @@ async def test_non_2xx_raises_transcription_error(status):
 
     with pytest.raises(TranscriptionError):
         await make(handler).transcribe(AUDIO, "audio/wav")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [401, 402, 403])
+async def test_a_refused_account_is_its_own_error(status):
+    def handler(request):
+        return httpx.Response(status, json={"err_msg": "nope"})
+
+    with pytest.raises(DeepgramAccountError, match=f"HTTP {status}"):
+        await make(handler).transcribe(AUDIO, "audio/wav")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [400, 429, 500, 503])
+async def test_other_failures_are_not_account_errors(status):
+    def handler(request):
+        return httpx.Response(status, json={"err_msg": "nope"})
+
+    with pytest.raises(TranscriptionError) as raised:
+        await make(handler).transcribe(AUDIO, "audio/wav")
+    assert not isinstance(raised.value, DeepgramAccountError)
 
 
 @pytest.mark.anyio

@@ -1,0 +1,104 @@
+# Every push to main/develop and every pull request: backend tests (with real MySQL and Redis,
+# so nothing skips), the backup service's tests, frontend lint/tests/build, and the e2e flows.
+# Branch protection on main and develop requires these to pass (docs/runbooks/deploys.md).
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: umless_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpw --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=40
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=5s --health-timeout=3s --health-retries=20
+    env:
+      # Throwaway databases: the tests drop every table and only touch umless:test:* keys.
+      UMLESS_TEST_DATABASE_URL: mysql+pymysql://root:rootpw@127.0.0.1:3306/umless_test?charset=utf8mb4
+      UMLESS_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: Install
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+      - name: Backend tests (incl. Schemathesis contract tests)
+        working-directory: backend
+        run: python -m pytest -q
+      - name: Backup service tests
+        working-directory: backup
+        run: python -m pytest -q test_backup.py
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Generated API client matches the contract
+        run: npm run gen:api && git diff --exit-code src/shared/api/generated/
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Backend venv (playwright.config.ts starts it from backend/.venv)
+        run: python -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
+      - name: Install
+        working-directory: frontend
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: E2E flows and accessibility
+        working-directory: frontend
+        run: npm run e2e
+      - name: Traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: frontend/test-results/
+          retention-days: 7

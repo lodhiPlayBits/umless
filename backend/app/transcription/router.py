@@ -16,7 +16,7 @@ from app.summary import transcript_body
 from app.takes.service import TakeHistory, get_take_history
 from app.transcription.deepgram import DeepgramTranscriber
 from app.transcription.fake import FakeTranscriber
-from app.transcription.models import Transcriber, TranscriptionError
+from app.transcription.models import DeepgramAccountError, Transcriber, TranscriptionError
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +133,11 @@ async def transcribe_one(
         # OverflowError: Deepgram's timings make the summary rates infinite.
         body = transcript_body(transcript)
     except (TranscriptionError, OverflowError) as exc:
-        # The user only sees "try again"; the cause (e.g. a revoked key, HTTP 401) goes to the
-        # log. TranscriptionError messages never contain the API key.
-        logger.warning("Transcription failed: %s", exc)
+        # The user only sees "try again"; the cause goes to the log. A refused account (revoked
+        # key, no credit) breaks every transcription, so it's an ERROR, which alerts.
+        # TranscriptionError messages never contain the API key.
+        level = logging.ERROR if isinstance(exc, DeepgramAccountError) else logging.WARNING
+        logger.log(level, "Transcription failed: %s", exc)
         raise ApiError(
             502, "transcription_failed", "Transcription failed. Try again in a moment."
         ) from None

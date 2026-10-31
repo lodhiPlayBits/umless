@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.log import start_logging
+from app.transcription import DeepgramAccountError, TranscriptionError
 from tests.test_limits import AUDIO, GatedTranscriber, make_app
 
 LINE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ (INFO|WARNING) [\w.]+ .+$")
@@ -124,3 +125,28 @@ def test_an_hourly_cap_refusal_is_logged(caplog, tmp_path):
         assert post(client).status_code == 429
 
     assert "Refused a transcription for local: over the hourly cap" in caplog.text
+
+
+class RefusedTranscriber:
+    def __init__(self, error):
+        self.error = error
+
+    async def transcribe(self, audio, content_type):
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    "error, level",
+    [
+        (DeepgramAccountError("Deepgram refused the account (HTTP 401): check the key and the balance"), "ERROR"),
+        (TranscriptionError("Deepgram returned HTTP 503"), "WARNING"),
+    ],
+)
+def test_a_refused_deepgram_account_is_logged_as_an_error(caplog, tmp_path, error, level):
+    # A revoked key or empty balance breaks every transcription: ERROR alerts, WARNING doesn't.
+    caplog.set_level(logging.INFO, logger="app")
+    with TestClient(make_app(RefusedTranscriber(error), data_file=tmp_path / "q.json"), base_url="http://localhost") as client:
+        assert post(client).status_code == 502
+
+    [record] = [r for r in caplog.records if r.getMessage().startswith("Transcription failed")]
+    assert record.levelname == level

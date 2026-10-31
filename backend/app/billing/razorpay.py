@@ -1,4 +1,4 @@
-"""Razorpay: create orders, confirm payments, and check payment and webhook signatures.
+"""Razorpay: create orders, confirm payments, refund them, and check payment and webhook signatures.
 
 A few REST calls and two HMAC checks, so plain httpx instead of Razorpay's SDK.
 """
@@ -79,6 +79,19 @@ class Razorpay:
                 return again.json().get("status") == "captured"
             payment = captured.json()
         return payment.get("status") == "captured"
+
+    def refund(self, payment_id: str, amount_paise: int, notes: dict) -> str:
+        """Refund a captured payment in full; the new refund's id (rfnd_...). Razorpay pays it
+        from the unsettled balance and refuses (RazorpayError) when that's too low."""
+        response = self._request(
+            "POST",
+            f"/payments/{payment_id}/refund",
+            "refund payment",
+            json={"amount": amount_paise, "speed": "normal", "notes": notes},
+        )
+        if response.status_code != 200:
+            raise RazorpayError(f"refund payment: HTTP {response.status_code} {response.text[:300]}")
+        return response.json()["id"]
 
     def payment_is_genuine(self, order_id: str, payment_id: str, signature: str) -> bool:
         """Checkout's success handler signature: HMAC-SHA256 of "order_id|payment_id"."""

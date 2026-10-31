@@ -14,7 +14,17 @@ from sqlalchemy import (
     update,
 )
 
-from app.billing.store import NEW_ACCOUNT, PAID_AT_FORMAT, Balance, Order, charged_seconds, utc_now
+from app.billing.store import (
+    NEW_ACCOUNT,
+    PAID_AT_FORMAT,
+    PURCHASED,
+    Balance,
+    Order,
+    RefundRefused,
+    charged_seconds,
+    refund_refusal,
+    utc_now,
+)
 from app.db import metadata
 
 accounts = Table(
@@ -36,11 +46,14 @@ payment_orders = Table(
     Column("pack_id", String(32), nullable=False),
     Column("amount_paise", Integer, nullable=False),
     Column("seconds", Integer, nullable=False),
-    Column("status", String(16), nullable=False),  # created | paid
+    Column("status", String(16), nullable=False),  # created | paid | refund_pending | refunded
     Column("payment_id", String(64), nullable=True),
     Column("created_at", DateTime, nullable=False),
     Column("paid_at", DateTime, nullable=True),
+    Column("refund_id", String(64), nullable=True),  # Razorpay's rfnd_...
+    Column("refunded_at", DateTime, nullable=True),
     Index("ix_payment_orders_user_id", "user_id"),
+    Index("ix_payment_orders_payment_id", "payment_id"),
     mysql_charset="utf8mb4",
     mysql_collate="utf8mb4_bin",
 )
@@ -127,7 +140,8 @@ class SqlBillingStore:
             if row is None:
                 return None
             self._ensure_account(conn, row.user_id)
-            if row.status != "paid":
+            # Only an unpaid order: a refunded one is never credited again by a late webhook.
+            if row.status == "created":
                 conn.execute(
                     update(payment_orders)
                     .where(payment_orders.c.id == order_id)
@@ -143,11 +157,73 @@ class SqlBillingStore:
     def purchases(self, user_id: str) -> list[Order]:
         query = (
             select(payment_orders)
-            .where(payment_orders.c.user_id == user_id, payment_orders.c.status == "paid")
+            .where(payment_orders.c.user_id == user_id, payment_orders.c.status.in_(PURCHASED))
             .order_by(payment_orders.c.paid_at.desc(), payment_orders.c.id)
         )
         with self._engine.connect() as conn:
             return [_order(row) for row in conn.execute(query)]
+
+    def order_for_payment(self, payment_id: str) -> Order | None:
+        with self._engine.connect() as conn:
+            row = conn.execute(select(payment_orders).where(payment_orders.c.payment_id == payment_id)).first()
+        return _order(row) if row else None
+
+    @staticmethod
+    def _lock_order(conn, order_id: str):
+        """The order, then its account, locked in that order (as mark_paid), so no deadlock."""
+        row = conn.execute(select(payment_orders).where(payment_orders.c.id == order_id).with_for_update()).first()
+        if row is None:
+            raise KeyError(order_id)
+        SqlBillingStore._ensure_account(conn, row.user_id)
+        conn.execute(select(accounts.c.user_id).where(accounts.c.user_id == row.user_id).with_for_update())
+        return row
+
+    @staticmethod
+    def _add_seconds(conn, user_id: str, seconds: int) -> None:
+        conn.execute(
+            update(accounts)
+            .where(accounts.c.user_id == user_id)
+            .values(seconds_left=func.greatest(accounts.c.seconds_left + seconds, 0))
+        )
+
+    @staticmethod
+    def _set(conn, order_id: str, **values) -> None:
+        conn.execute(update(payment_orders).where(payment_orders.c.id == order_id).values(**values))
+
+    def start_refund(self, order_id: str) -> Order:
+        with self._engine.begin() as conn:
+            row = self._lock_order(conn, order_id)
+            reason = refund_refusal(_order(row), self._read(conn, row.user_id), utc_now())
+            if reason:
+                raise RefundRefused(reason)
+            self._add_seconds(conn, row.user_id, -row.seconds)
+            self._set(conn, order_id, status="refund_pending")
+            return _order(conn.execute(select(payment_orders).where(payment_orders.c.id == order_id)).one())
+
+    def refund_started(self, order_id: str, refund_id: str) -> None:
+        with self._engine.begin() as conn:
+            self._set(conn, order_id, refund_id=refund_id)
+
+    def cancel_refund(self, order_id: str) -> None:
+        self.refund_failed(order_id)
+
+    def refund_processed(self, order_id: str, refund_id: str) -> str:
+        with self._engine.begin() as conn:
+            row = self._lock_order(conn, order_id)
+            if row.status in ("paid", "refund_pending"):
+                if row.status == "paid":
+                    self._add_seconds(conn, row.user_id, -row.seconds)
+                self._set(conn, order_id, status="refunded", refund_id=refund_id, refunded_at=utc_now())
+            return row.status
+
+    def refund_failed(self, order_id: str) -> bool:
+        with self._engine.begin() as conn:
+            row = self._lock_order(conn, order_id)
+            if row.status != "refund_pending":
+                return False
+            self._add_seconds(conn, row.user_id, row.seconds)
+            self._set(conn, order_id, status="paid", refund_id=None)
+            return True
 
 
 def _order(row) -> Order:
@@ -160,4 +236,6 @@ def _order(row) -> Order:
         status=row.status,
         payment_id=row.payment_id,
         paid_at=row.paid_at.strftime(PAID_AT_FORMAT) if row.paid_at else None,
+        refund_id=row.refund_id,
+        refunded_at=row.refunded_at.strftime(PAID_AT_FORMAT) if row.refunded_at else None,
     )

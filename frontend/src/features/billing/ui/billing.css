@@ -12,3 +12,5 @@
 .billing__note { font-size: var(--text-sm); line-height: var(--leading-sm); }
 .billing__purchases code { font-size: var(--text-xs); }
 .billing__purchases .ui-row__end { font-variant-numeric: tabular-nums; }
+.billing__purchases .ui-badge { margin-inline-start: var(--space-2); vertical-align: middle; }
+.billing__purchase-end { display: flex; align-items: center; gap: var(--space-3); }

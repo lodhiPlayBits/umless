@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.auth import get_user_id
 from app.billing.packs import PACKS
 from app.billing.razorpay import Razorpay, RazorpayError
-from app.billing.store import Balance, BillingStore, Order
+from app.billing.store import Balance, BillingStore, Order, RefundRefused, refund_refusal, utc_now
 from app.errors import ApiError
 from app.questions.router import require_json
 
@@ -82,7 +82,11 @@ def get_account(
     return account_body(billing.balance(user_id) if billing else None)
 
 
-def purchase_body(order: Order) -> dict:
+def order_not_found() -> ApiError:
+    return ApiError(404, "order_not_found", "That payment order doesn't exist.")
+
+
+def purchase_body(order: Order, refundable: bool) -> dict:
     pack = PACKS.get(order.pack_id)
     return {
         "order_id": order.id,
@@ -94,6 +98,8 @@ def purchase_body(order: Order) -> dict:
         "amount_paise": order.amount_paise,
         "currency": pack.currency if pack else "INR",
         "paid_at": order.paid_at,
+        "status": order.status,
+        "refundable": refundable,
     }
 
 
@@ -102,7 +108,49 @@ def list_purchases(
     user_id: str = Depends(get_user_id), billing: BillingStore | None = Depends(get_billing)
 ) -> dict:
     # A server without payments has nothing to list, like /api/account's "metered": false.
-    return {"items": [purchase_body(order) for order in billing.purchases(user_id)] if billing else []}
+    if billing is None:
+        return {"items": []}
+    balance, now = billing.balance(user_id), utc_now()
+    return {
+        "items": [
+            purchase_body(order, refundable=refund_refusal(order, balance, now) is None)
+            for order in billing.purchases(user_id)
+        ]
+    }
+
+
+@router.post("/payments/{order_id}/refund")
+def request_refund(
+    # Unvalidated on purpose: a malformed id is one that doesn't exist (404), as on the question routes.
+    order_id: str,
+    user_id: str = Depends(get_user_id),
+    billing: BillingStore | None = Depends(get_billing),
+    razorpay: Razorpay | None = Depends(get_razorpay),
+) -> dict:
+    """Self-serve refund of an unused pack (docs/roadmap/2026-10-31-self-serve-refunds.md)."""
+    if billing is None or razorpay is None:
+        raise payments_unavailable()
+    order = billing.get_order(order_id)
+    # Someone else's order, or a checkout never paid, is no different from a missing one.
+    if order is None or order.user_id != user_id or order.status == "created":
+        raise order_not_found()
+    try:
+        # The time goes first, so it can't be spent while Razorpay refunds the money.
+        order = billing.start_refund(order.id)
+    except RefundRefused as exc:
+        raise ApiError(409, "refund_not_allowed", str(exc)) from None
+    try:
+        refund_id = razorpay.refund(order.payment_id, order.amount_paise, {"order_id": order.id, "user_id": user_id})
+    except RazorpayError as exc:
+        billing.cancel_refund(order.id)
+        # ERROR: often the Razorpay balance is too low to pay refunds, which needs you.
+        logger.error("Refund of order %s failed at Razorpay; the time was put back: %s", order.id, exc)
+        raise ApiError(
+            502, "payment_provider_failed", "The refund couldn't be started. Your practice time is unchanged; try again later."
+        ) from None
+    billing.refund_started(order.id, refund_id)
+    logger.info("Refund %s requested for order %s by %s", refund_id, order.id, user_id)
+    return purchase_body(order, refundable=False)
 
 
 @router.post("/payments/orders", status_code=201, dependencies=[Depends(require_json)])
@@ -182,9 +230,15 @@ async def razorpay_webhook(
         raise payment_invalid()
     try:
         event = json.loads(raw)
-        payment = event["payload"]["payment"]["entity"]
-        kind, order_id, payment_id, amount = event["event"], payment["order_id"], payment["id"], payment["amount"]
+        kind = event["event"]
     except (ValueError, KeyError, TypeError):
+        return {"status": "ignored"}
+    if kind in ("refund.processed", "refund.failed"):
+        return await run_in_threadpool(refund_event, billing, kind, event)
+    try:
+        payment = event["payload"]["payment"]["entity"]
+        order_id, payment_id, amount = payment["order_id"], payment["id"], payment["amount"]
+    except (KeyError, TypeError):
         # Genuine but not a payment event we use; 200 so Razorpay doesn't retry it.
         return {"status": "ignored"}
     if kind not in ("payment.captured", "order.paid") or not order_id:
@@ -194,4 +248,27 @@ async def razorpay_webhook(
         logger.warning("Webhook for unknown or mismatched order %s", order_id)
         return {"status": "ignored"}
     await run_in_threadpool(billing.mark_paid, order.id, payment_id)
+    return {"status": "ok"}
+
+
+def refund_event(billing: BillingStore, kind: str, event: dict) -> dict:
+    """refund.processed / refund.failed, for refunds started here or in Razorpay's dashboard."""
+    try:
+        refund = event["payload"]["refund"]["entity"]
+        refund_id, payment_id, amount = refund["id"], refund["payment_id"], refund["amount"]
+    except (KeyError, TypeError):
+        return {"status": "ignored"}
+    order = billing.order_for_payment(payment_id)
+    if order is None:
+        logger.warning("Refund %s is for unknown payment %s", refund_id, payment_id)
+        return {"status": "ignored"}
+    if amount != order.amount_paise:
+        # Only full refunds are automatic; a partial one (made in the dashboard) needs you.
+        logger.warning("Partial refund %s of order %s (%s of %s paise): adjust the time by hand", refund_id, order.id, amount, order.amount_paise)
+        return {"status": "ignored"}
+    if kind == "refund.processed":
+        before = billing.refund_processed(order.id, refund_id)
+        logger.info("Refund %s of order %s went through (was %s)", refund_id, order.id, before)
+    elif billing.refund_failed(order.id):
+        logger.error("Refund %s of order %s failed at Razorpay; the time was put back", refund_id, order.id)
     return {"status": "ok"}

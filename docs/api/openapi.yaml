@@ -499,8 +499,9 @@ paths:
       tags: [billing]
       summary: The signed-in user's purchases, newest first
       description: >-
-        Paid orders only (a checkout that was opened and closed isn't a purchase). Empty on a
-        server without payments.
+        Paid orders, including refunded ones and those with a refund in progress (a checkout
+        that was opened and closed isn't a purchase). Each says whether it can be refunded now.
+        Empty on a server without payments.
       x-screen:
         - settings-billing / purchases
       responses:
@@ -611,6 +612,75 @@ paths:
         '503':
           $ref: '#/components/responses/PaymentsUnavailable'
 
+  /api/payments/{orderId}/refund:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        description: Razorpay's order id, from listPurchases.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: order_Tu3l5LvVnBJXfu
+    post:
+      operationId: requestRefund
+      tags: [billing]
+      summary: Refund an unused pack bought in the last 7 days
+      description: |
+        Self-serve refund under the published policy. Allowed when the purchase is `paid`, was
+        paid within the last 7 days, and the account's paid time still covers the pack's
+        time (it hasn't been used); `refundable` in listPurchases says the same. The pack's time
+        is removed at once and Razorpay is asked to refund the full amount; the purchase is
+        then `refund_pending` until Razorpay's `refund.processed` webhook makes it `refunded`
+        (or `refund.failed` puts the time back and makes it `paid` again). No request body.
+      x-screen:
+        - settings-billing / purchases / request refund
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '200':
+          description: The purchase, now `refund_pending`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Purchase'
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '404':
+          description: No paid purchase of the signed-in user has this id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: order_not_found
+                detail: That payment order doesn't exist.
+        '409':
+          description: |
+            The policy doesn't allow it: already refunded or in progress, paid more than 7 days
+            ago, or some of the time has been used. `detail` says which.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: refund_not_allowed
+                detail: This pack was bought more than 7 days ago, so it can't be refunded.
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          description: Razorpay couldn't be reached or refused the refund; the time is unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: payment_provider_failed
+                detail: The refund couldn't be started. Your practice time is unchanged; try again later.
+        '503':
+          $ref: '#/components/responses/PaymentsUnavailable'
+
   /api/payments/webhook:
     post:
       operationId: razorpayWebhook
@@ -620,7 +690,10 @@ paths:
         Called by Razorpay, not the browser, so it needs no sign-in: the
         `X-Razorpay-Signature` header (HMAC-SHA256 of the raw body with the webhook secret)
         proves it. `payment.captured` and `order.paid` credit a known order whose amount
-        matches, once; anything else is acknowledged and ignored.
+        matches, once, and only while it is still unpaid (never a refunded one).
+        `refund.processed` for the full amount makes the order `refunded` (taking its time back
+        if the refund was started outside umless); `refund.failed` puts the time back and makes
+        a `refund_pending` order `paid` again. Anything else is acknowledged and ignored.
       security: []
       parameters:
         - name: X-Razorpay-Signature
@@ -1234,7 +1307,7 @@ components:
     Purchase:
       type: object
       additionalProperties: false
-      required: [order_id, payment_id, pack_id, label, seconds, amount_paise, currency, paid_at]
+      required: [order_id, payment_id, pack_id, label, seconds, amount_paise, currency, paid_at, status, refundable]
       properties:
         order_id:
           type: string
@@ -1265,6 +1338,17 @@ components:
           type: string
           format: date-time
           description: When the payment was confirmed, UTC.
+        status:
+          type: string
+          enum: [paid, refund_pending, refunded]
+          description: >-
+            `refund_pending`: the time has been removed and Razorpay is returning the money;
+            `refunded`: Razorpay has refunded it.
+        refundable:
+          type: boolean
+          description: >-
+            Whether requestRefund would accept it now: `paid`, paid within the last 7 days, and
+            the account's paid time still covers its time.
       example:
         order_id: order_Tu3l5LvVnBJXfu
         payment_id: pay_Tu3lhmtObPkSdy
@@ -1274,6 +1358,8 @@ components:
         amount_paise: 4000
         currency: INR
         paid_at: '2026-10-30T08:50:46Z'
+        status: paid
+        refundable: true
 
     PurchaseList:
       type: object
@@ -1352,6 +1438,7 @@ components:
         - payment_invalid
         - payment_provider_failed
         - payments_unavailable
+        - refund_not_allowed
         - not_found
         - method_not_allowed
         - empty_audio

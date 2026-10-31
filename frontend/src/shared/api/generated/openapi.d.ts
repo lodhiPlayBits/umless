@@ -209,7 +209,7 @@ export interface paths {
         };
         /**
          * The signed-in user's purchases, newest first
-         * @description Paid orders only (a checkout that was opened and closed isn't a purchase). Empty on a server without payments.
+         * @description Paid orders, including refunded ones and those with a refund in progress (a checkout that was opened and closed isn't a purchase). Each says whether it can be refunded now. Empty on a server without payments.
          */
         get: operations["listPurchases"];
         put?: never;
@@ -264,6 +264,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/payments/{orderId}/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Razorpay's order id, from listPurchases. */
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refund an unused pack bought in the last 7 days
+         * @description Self-serve refund under the published policy. Allowed when the purchase is `paid`, was
+         *     paid within the last 7 days, and the account's paid time still covers the pack's
+         *     time (it hasn't been used); `refundable` in listPurchases says the same. The pack's time
+         *     is removed at once and Razorpay is asked to refund the full amount; the purchase is
+         *     then `refund_pending` until Razorpay's `refund.processed` webhook makes it `refunded`
+         *     (or `refund.failed` puts the time back and makes it `paid` again). No request body.
+         */
+        post: operations["requestRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/payments/webhook": {
         parameters: {
             query?: never;
@@ -278,7 +306,10 @@ export interface paths {
          * @description Called by Razorpay, not the browser, so it needs no sign-in: the
          *     `X-Razorpay-Signature` header (HMAC-SHA256 of the raw body with the webhook secret)
          *     proves it. `payment.captured` and `order.paid` credit a known order whose amount
-         *     matches, once; anything else is acknowledged and ignored.
+         *     matches, once, and only while it is still unpaid (never a refunded one).
+         *     `refund.processed` for the full amount makes the order `refunded` (taking its time back
+         *     if the refund was started outside umless); `refund.failed` puts the time back and makes
+         *     a `refund_pending` order `paid` again. Anything else is acknowledged and ignored.
          */
         post: operations["razorpayWebhook"];
         delete?: never;
@@ -656,7 +687,9 @@ export interface components {
          *       "seconds": 3600,
          *       "amount_paise": 4000,
          *       "currency": "INR",
-         *       "paid_at": "2026-10-30T08:50:46Z"
+         *       "paid_at": "2026-10-30T08:50:46Z",
+         *       "status": "paid",
+         *       "refundable": true
          *     }
          */
         Purchase: {
@@ -675,6 +708,13 @@ export interface components {
              * @description When the payment was confirmed, UTC.
              */
             paid_at: string;
+            /**
+             * @description `refund_pending`: the time has been removed and Razorpay is returning the money; `refunded`: Razorpay has refunded it.
+             * @enum {string}
+             */
+            status: "paid" | "refund_pending" | "refunded";
+            /** @description Whether requestRefund would accept it now: `paid`, paid within the last 7 days, and the account's paid time still covers its time. */
+            refundable: boolean;
         };
         PurchaseList: {
             /** @description Newest first. */
@@ -708,7 +748,7 @@ export interface components {
          * @example validation_error
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
+        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "refund_not_allowed" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
         /**
          * @example {
          *       "field": "text",
@@ -1441,6 +1481,81 @@ export interface operations {
             422: components["responses"]["ValidationError"];
             500: components["responses"]["InternalError"];
             502: components["responses"]["PaymentProviderFailed"];
+            503: components["responses"]["PaymentsUnavailable"];
+        };
+    };
+    requestRefund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Razorpay's order id, from listPurchases. */
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The purchase, now `refund_pending`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Purchase"];
+                };
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            /** @description No paid purchase of the signed-in user has this id. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "order_not_found",
+                     *       "detail": "That payment order doesn't exist."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description The policy doesn't allow it: already refunded or in progress, paid more than 7 days
+             *     ago, or some of the time has been used. `detail` says which.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "refund_not_allowed",
+                     *       "detail": "This pack was bought more than 7 days ago, so it can't be refunded."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description Razorpay couldn't be reached or refused the refund; the time is unchanged. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "payment_provider_failed",
+                     *       "detail": "The refund couldn't be started. Your practice time is unchanged; try again later."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             503: components["responses"]["PaymentsUnavailable"];
         };
     };

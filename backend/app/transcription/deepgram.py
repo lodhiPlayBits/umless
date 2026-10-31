@@ -3,9 +3,11 @@ import math
 import httpx
 
 from app.config import DEEPGRAM_MODEL, DEEPGRAM_PARAMS
-from app.transcription.models import Transcript, TranscriptionError, Word
+from app.transcription.models import DeepgramAccountError, Transcript, TranscriptionError, Word
 
 DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
+# Invalid or revoked key, out of credit, or the key lacks permission.
+ACCOUNT_STATUSES = {401, 402, 403}
 MAX_TIMESTAMP_SECONDS = 24 * 60 * 60
 
 
@@ -77,6 +79,10 @@ class DeepgramTranscriber:
                 f"Deepgram request failed: {type(exc).__name__}"
             ) from None
 
+        if response.status_code in ACCOUNT_STATUSES:
+            raise DeepgramAccountError(
+                f"Deepgram refused the account (HTTP {response.status_code}): check the key and the balance"
+            )
         if not response.is_success:
             raise TranscriptionError(f"Deepgram returned HTTP {response.status_code}")
 

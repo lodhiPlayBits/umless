@@ -53,6 +53,8 @@ export default defineConfig({
         RAZORPAY_KEY_ID: '',
         RAZORPAY_KEY_SECRET: '',
         RAZORPAY_WEBHOOK_SECRET: '',
+        // Limits in memory, not the production Redis named in backend/.env.
+        REDIS_URL: '',
       },
       reuseExistingServer: false,
       timeout: 60_000,

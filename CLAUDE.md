@@ -59,10 +59,11 @@ Git Bash on Windows. The backend venv is the Windows one; WSL uses `.venv/Script
 | E2E | `cd frontend && npm run e2e` (starts its own servers) |
 | Regenerate the API client | `cd frontend && npm run gen:api` |
 | Everything before a commit | the project `verify` skill (`.claude/skills/verify/SKILL.md`) |
+| CI (every push and PR) | `.github/workflows/ci.yml`: backend with MySQL + Redis, frontend, e2e |
 
 Run without a Deepgram key: set `UMLESS_TRANSCRIBER=fake`. The real key goes in `backend/.env` (see `backend/.env.example`). `pytest --run-live` makes one real Deepgram call.
 
-On the Oracle server there is no Node or Python on the host: run checks in containers (`node:22-alpine` for the frontend, `python:3.12-slim` for the backend, `mcr.microsoft.com/playwright:v1.64.1-noble` for e2e with `UMLESS_PYTHON` pointing at a venv inside it), then `sudo chown -R ubuntu:ubuntu` what they wrote. Deploy with `sg docker -c 'docker compose up -d --build <service>'` in `deploy/`, then `docker compose restart nginx`. MySQL tests need `UMLESS_TEST_DATABASE_URL` pointing at a throwaway database (every table is dropped): a temporary `mysql:8.4` container works. Redis tests need `UMLESS_TEST_REDIS_URL` (a temporary `redis:7.4-alpine` container). `backend/.env` on the server has `DB_HOST`, so importing the app there needs `REDIS_URL` set too.
+On the Oracle server there is no Node or Python on the host: run checks in containers (`node:22-alpine` for the frontend, `python:3.12-slim` for the backend, `mcr.microsoft.com/playwright:v1.64.1-noble` for e2e with `UMLESS_PYTHON` pointing at a venv inside it), then `sudo chown -R ubuntu:ubuntu` what they wrote. Deploy only tagged, CI-green commits: `sg docker -c 'sh deploy/deploy.sh vX.Y.Z'` (backup, rollback tags, build, health check, automatic rollback; `docs/runbooks/deploys.md`). Never `docker compose up --build nginx`: it also rebuilds the backend and frontend images. MySQL tests need `UMLESS_TEST_DATABASE_URL` pointing at a throwaway database (every table is dropped): a temporary `mysql:8.4` container works. Redis tests need `UMLESS_TEST_REDIS_URL` (a temporary `redis:7.4-alpine` container). `backend/.env` on the server has `DB_HOST`, so importing the app there needs `REDIS_URL` set too.
 
 Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks during development used 8765 and 5174. Never test against 8000 with real data: point `UMLESS_DATA_FILE` at a scratch file and use another port.
 
@@ -77,6 +78,7 @@ Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks
 - **Fillers** are exactly `um`, `uh`, `mhmm`. Deepgram's uh-huh, uh-uh, mm-mm and nuh-uh are yes/no answers and count as ordinary words.
 - **Styling:** plain CSS with tokens from `src/shared/theme/tokens.css` (the only file with colour values; light, dark and system). Build screens from `@/shared/ui` primitives (`ui-` classes, style guide at `/_ui` in dev); `app/index.css` is the old global layer, removed in Phase 6. Where `flows.md` and the wireframe disagree on wording, the wireframe wins.
 - **Logging:** use `logging.getLogger(__name__)`; `app/log.py` puts every record on a queue, so log calls never block a request. Never log transcript text or keys. Tests build `Settings()` directly (no `log_level`), which leaves logging alone so `caplog` works.
+- **Order statuses** `created → paid → refund_pending → refunded`: only a `created` order is ever credited (`mark_paid`), so late payment webhooks can't credit a refunded one. The refund rule is `refund_refusal()` in `app/billing/store.py`, used by the list (`refundable`) and the endpoint alike.
 - **Questions file** `backend/data/questions.json` is git-ignored. A corrupt file stops startup and is never overwritten.
 
 ## Working with the user
@@ -98,7 +100,7 @@ Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks
 ## Open items
 
 - Deleting a Clerk account doesn't delete that user's questions, takes, transcripts or balance: needs a Clerk `user.deleted` webhook (decision pending).
-- Launch: Clerk still on its development instance (`pk_test_`); live Razorpay webhook secret not set; refunded practice time is removed by hand.
+- Launch: tracked in `docs/roadmap/2026-10-30-launch-readiness.md`. Clerk is on its production instance and the Razorpay webhook is live (2026-10-30). Refunds of unused packs are self-serve; exceptions by hand (`docs/runbooks/refunds.md`).
 - E2E (`tests/e2e/a11y.spec.ts`) gates WCAG 2.2 AA on every signed-in and public page; the landing and sign-in pages only render signed out, so check them against the live site.
 - Not verified: Firefox and Safari.
 - Known minor issues from the v1.0.0 reviews are listed in `docs/builds/v1.0.0-BUILD.md`; check whether the refactor PRs (#4, #5) already fixed each one before working on it.

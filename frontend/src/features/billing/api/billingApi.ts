@@ -26,3 +26,8 @@ export async function listPurchases(signal?: AbortSignal): Promise<Purchase[]> {
   const body = await unwrap(client.GET('/api/payments', { signal }))
   return body.items
 }
+
+/** docs/api/openapi.yaml requestRefund: refund an unused pack; the purchase comes back refund_pending. */
+export function requestRefund(orderId: string): Promise<Purchase> {
+  return unwrap(client.POST('/api/payments/{orderId}/refund', { params: { path: { orderId } } }))
+}

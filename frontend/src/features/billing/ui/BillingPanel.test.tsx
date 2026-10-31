@@ -6,6 +6,7 @@ import * as billingApi from '../api/billingApi'
 import type { Account } from '../api/billingApi'
 import { PaymentFailedError } from '../model/checkout'
 import { purchaseErrorMessage } from '../model/usePurchase'
+import { refundErrorMessage } from '../model/useRefund'
 import BillingPanel from './BillingPanel'
 import OutOfTimeBanner from './OutOfTimeBanner'
 import PurchaseHistory from './PurchaseHistory'
@@ -14,9 +15,11 @@ vi.mock('../api/billingApi', async (importOriginal) => ({
   ...(await importOriginal<typeof billingApi>()),
   getAccount: vi.fn(),
   listPurchases: vi.fn(),
+  requestRefund: vi.fn(),
 }))
 const getAccount = vi.mocked(billingApi.getAccount)
 const listPurchases = vi.mocked(billingApi.listPurchases)
+const requestRefund = vi.mocked(billingApi.requestRefund)
 
 const packs: Account['packs'] = [
   { id: 'session_1', label: '1 session', seconds: 3600, amount_paise: 4000, currency: 'INR' },
@@ -27,6 +30,7 @@ const account = (free: number, seconds: number, metered = true): Account => ({ m
 beforeEach(() => {
   getAccount.mockReset()
   listPurchases.mockReset().mockResolvedValue([])
+  requestRefund.mockReset()
 })
 
 describe('BillingPanel', () => {
@@ -79,7 +83,7 @@ describe('BillingPanel', () => {
 })
 
 describe('Purchases', () => {
-  const purchase = {
+  const purchase: billingApi.Purchase = {
     order_id: 'order_1',
     payment_id: 'pay_Tu3lhmtObPkSdy',
     pack_id: 'session_1',
@@ -88,6 +92,8 @@ describe('Purchases', () => {
     amount_paise: 4000,
     currency: 'INR',
     paid_at: '2026-10-30T08:50:46Z',
+    status: 'paid',
+    refundable: false,
   }
 
   it('lists each purchase with the time it added, the amount and its payment id', async () => {
@@ -116,6 +122,86 @@ describe('Purchases', () => {
     await screen.findByText('No purchases yet')
     await userEvent.click(screen.getByRole('button', { name: 'Buy 1 session' }))
     expect(await screen.findByText('pay_Tu3lhmtObPkSdy')).toBeInTheDocument()
+  })
+})
+
+describe('Purchases: refunds', () => {
+  const paid: billingApi.Purchase = {
+    order_id: 'order_1',
+    payment_id: 'pay_1',
+    pack_id: 'session_1',
+    label: '1 session · 60 minutes',
+    seconds: 3600,
+    amount_paise: 4000,
+    currency: 'INR',
+    paid_at: '2026-10-30T08:50:46Z',
+    status: 'paid',
+    refundable: true,
+  }
+
+  it('offers a refund only on refundable purchases', async () => {
+    listPurchases.mockResolvedValue([paid, { ...paid, order_id: 'order_2', payment_id: 'pay_2', refundable: false }])
+    render(<PurchaseHistory />)
+    await screen.findByText('pay_2')
+    expect(screen.getAllByRole('button', { name: 'Request refund' })).toHaveLength(1)
+    expect(within(screen.getByText('pay_1').closest('li')!).getByRole('button', { name: 'Request refund' })).toBeInTheDocument()
+  })
+
+  it('shows refunds in progress and done', async () => {
+    listPurchases.mockResolvedValue([
+      { ...paid, status: 'refund_pending', refundable: false },
+      { ...paid, order_id: 'order_2', payment_id: 'pay_2', status: 'refunded', refundable: false },
+    ])
+    render(<PurchaseHistory />)
+    expect(await screen.findByText('Refund in progress')).toBeInTheDocument()
+    expect(screen.getByText('Refunded')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Request refund' })).toBeNull()
+  })
+
+  it('asks first, then requests the refund and reloads the list', async () => {
+    listPurchases.mockResolvedValueOnce([paid]).mockResolvedValue([{ ...paid, status: 'refund_pending', refundable: false }])
+    requestRefund.mockResolvedValue({ ...paid, status: 'refund_pending', refundable: false })
+    render(<PurchaseHistory />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Request refund' }))
+
+    const dialog = screen.getByRole('alertdialog', { name: 'Refund ₹40?' })
+    expect(within(dialog).getByText(/1 h will be removed from your practice time now/)).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Refund' }))
+
+    expect(requestRefund).toHaveBeenCalledWith('order_1')
+    expect(await screen.findByText('Refund requested.')).toBeInTheDocument()
+    expect(await screen.findByText('Refund in progress')).toBeInTheDocument()
+  })
+
+  it('cancelling the question requests nothing', async () => {
+    listPurchases.mockResolvedValue([paid])
+    render(<PurchaseHistory />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Request refund' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(requestRefund).not.toHaveBeenCalled()
+  })
+
+  it("shows the server's reason when the refund isn't allowed", async () => {
+    listPurchases.mockResolvedValue([paid])
+    requestRefund.mockRejectedValue(
+      new ApiError("Some of this pack's practice time has been used, so it can't be refunded.", 409, 'refund_not_allowed'),
+    )
+    render(<PurchaseHistory />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Request refund' }))
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Refund' }))
+    expect(await screen.findByText("The refund couldn't be requested")).toBeInTheDocument()
+    expect(screen.getByText(/has been used, so it can't be refunded/)).toBeInTheDocument()
+  })
+})
+
+describe('refundErrorMessage', () => {
+  it.each([
+    [new ApiError('Your practice time is unchanged; try again later.', 502, 'payment_provider_failed'), 'Your practice time is unchanged; try again later.'],
+    [new ApiError("That payment order doesn't exist.", 404, 'order_not_found'), "This purchase can't be found any more. Reload the page."],
+    [new ApiError('Could not reach the server', 0), "The refund couldn't be requested. Check your connection and try again."],
+  ])('%s', (error, message) => {
+    expect(refundErrorMessage(error)).toBe(message)
   })
 })
 
