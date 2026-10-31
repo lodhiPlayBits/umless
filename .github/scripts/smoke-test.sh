@@ -20,8 +20,10 @@ body=$(curl -fsS --max-time 15 "$url/" 2>/dev/null) && grep -q 'id="root"' <<<"$
     && pass "home page serves the app" || fail "home page serves the app"
 
 asset=$(grep -o '/assets/index-[^"]*\.js' <<<"${body:-}" | head -1)
-[ -n "$asset" ] && curl -fsS -o /dev/null --max-time 15 "$url$asset" \
-    && pass "app bundle $asset loads" || fail "app bundle loads"
+bundle=$([ -n "$asset" ] && curl -fsS --max-time 15 "$url$asset" 2>/dev/null)
+[ -n "$bundle" ] && pass "app bundle $asset loads" || fail "app bundle loads"
+# Sign-in needs Clerk's production key baked into the bundle (a missing key still renders a page).
+grep -q 'pk_live_' <<<"${bundle:-}" && pass "bundle has Clerk's production key" || fail "bundle has Clerk's production key"
 
 curl -fsS --max-time 10 "$url/api/health" 2>/dev/null | grep -q '"ok"' \
     && pass "/api/health ok" || fail "/api/health ok"

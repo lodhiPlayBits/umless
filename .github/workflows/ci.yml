@@ -264,6 +264,18 @@ jobs:
           platforms: arm64
       - uses: docker/setup-buildx-action@v3
 
+      # Vite bakes the Clerk key into the bundle: without it the site builds fine but sign-in is
+      # broken, so stop here. It's a repository *variable* (public), not a secret.
+      - name: Clerk key is set
+        if: matrix.image == 'frontend' && steps.changes.outputs.build == 'true'
+        env:
+          KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+        run: |
+          case "$KEY" in
+            pk_live_*|pk_test_*) echo "Clerk key: ${KEY%%_*}_${KEY#*_}" | cut -c1-24 ;;
+            *) echo "Repository variable VITE_CLERK_PUBLISHABLE_KEY is missing (Settings → Secrets and variables → Actions → Variables)."; exit 1 ;;
+          esac
+
       - name: Build image (linux/arm64)
         if: steps.changes.outputs.build == 'true'
         uses: docker/build-push-action@v6
