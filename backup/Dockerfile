@@ -2,7 +2,10 @@
 FROM mysql:8.4
 
 RUN microdnf install -y python3 python3-pip && microdnf clean all \
-    && pip3 install --no-cache-dir oci==2.189.0
+    && pip3 install --no-cache-dir oci==2.189.0 \
+    # Only mysqldump is used: drop MySQL Shell (bundles its own Python packages) and gosu (the
+    # server entrypoint's helper), which CI's Trivy gate flags and this image never runs.
+    && rm -rf /usr/lib/mysqlsh /usr/bin/mysqlsh /usr/local/bin/gosu
 
 WORKDIR /backup
 COPY backup.py .

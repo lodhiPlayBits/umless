@@ -1,7 +1,9 @@
 FROM nginx:1.27-alpine
 
-# openssl: the entrypoint makes a self-signed cert until Let's Encrypt has issued one.
-RUN apk add --no-cache openssl
+# apk upgrade: take Alpine's security fixes newer than the base image (CI's Trivy gate fails on
+# fixable CRITICALs). openssl: the entrypoint makes a self-signed cert until Let's Encrypt has
+# issued one.
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY snippets/ /etc/nginx/snippets/

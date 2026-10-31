@@ -11,6 +11,8 @@ ARG CLERK_PUBLISHABLE_KEY=""
 RUN if [ -n "$CLERK_PUBLISHABLE_KEY" ]; then export VITE_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; fi && npm run build
 
 FROM nginx:1.27-alpine
+# Alpine's security fixes newer than the base image (CI's Trivy gate fails on fixable CRITICALs).
+RUN apk upgrade --no-cache
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

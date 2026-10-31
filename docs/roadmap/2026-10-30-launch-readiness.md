@@ -153,6 +153,14 @@ Order: 1 first (live money was at risk). Phase 0 is deferred to just before laun
     - the smoke test passes against the live site (10/10);
     - `ci-deploy.sh` refuses everything but `deploy <hex sha>` and passes on deploy.sh's exit code (tested with a fake deploy). That caught 2 bugs of mine: tee hid the exit code, then `set -e` skipped saving it.
   - **Left (you):** run `setup-ci-access.sh`; add the deploy key, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` and the variable; branch protection on `ci-passed`; first merge to `main`.
+- 2026-10-31: **First CI run: the Trivy image gate stopped `gateway`** on CVE-2026-111497, a CRITICAL in `brotli-libs` 1.1.0-r2 (fixed in 1.1.1-r0).
+  - A local scan of all 4 images with Trivy 0.70.0 found more:
+    - frontend: the same brotli flaw, plus OpenSSL `libcrypto3`/`libssl3` 3.3.3 (fixed in 3.3.7);
+    - backup: `certifi` in MySQL Shell's bundled Python and Go stdlib in `gosu`. The backup uses neither.
+  - Fixes:
+    - `apk upgrade` in the gateway and frontend images;
+    - MySQL Shell and `gosu` deleted from the backup image.
+  - Rebuilt and rescanned: no fixable CRITICALs in any image; the 5 filesystem scans pass. The gateway config is valid, the frontend serves, and the backup still has `mysqldump` 8.4.13 and the OCI SDK.
 
 ## Phases
 
