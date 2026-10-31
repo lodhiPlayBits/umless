@@ -5,7 +5,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+# CI builds pass the Clerk key (public) as a build argument; a build on the server reads it from
+# frontend/.env instead. Only set it when given: an empty variable would override the .env file.
+ARG CLERK_PUBLISHABLE_KEY=""
+RUN if [ -n "$CLERK_PUBLISHABLE_KEY" ]; then export VITE_CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"; fi && npm run build
 
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf

@@ -1,11 +1,16 @@
 # Every push to main/develop and every pull request: backend tests (with real MySQL and Redis,
-# so nothing skips), the backup service's tests, frontend lint/tests/build, and the e2e flows.
-# Branch protection on main and develop requires these to pass (docs/runbooks/deploys.md).
+# so nothing skips), the backup service's tests, frontend lint/tests/build, the e2e flows and a
+# SonarCloud analysis. A version tag (v1.2.0) also builds the four images for the server (ARM)
+# and pushes them to OCIR, where deploy/deploy.sh pulls them (docs/runbooks/deploys.md).
+# Branch protection on main and develop requires the test jobs to pass.
+#
+# GitHub settings: secrets OCIR_USERNAME, OCIR_TOKEN, SONAR_TOKEN; variable VITE_CLERK_PUBLISHABLE_KEY.
 name: CI
 
 on:
   push:
     branches: [main, develop]
+    tags: ["v*"]
   pull_request:
 
 concurrency:
@@ -49,10 +54,15 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Backend tests (incl. Schemathesis contract tests)
         working-directory: backend
-        run: python -m pytest -q
+        run: python -m pytest -q --cov=app --cov-report=xml:coverage.xml
       - name: Backup service tests
         working-directory: backup
         run: python -m pytest -q test_backup.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 1
 
   frontend:
     runs-on: ubuntu-24.04
@@ -70,8 +80,13 @@ jobs:
       - name: Generated API client matches the contract
         run: npm run gen:api && git diff --exit-code src/shared/api/generated/
       - run: npm run lint
-      - run: npm test
+      - run: npm test -- --coverage
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
+          retention-days: 1
 
   e2e:
     runs-on: ubuntu-24.04
@@ -102,3 +117,72 @@ jobs:
           name: playwright-traces
           path: frontend/test-results/
           retention-days: 7
+
+  sonar:
+    # Pull requests from forks get no secrets; skip rather than fail there.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history: SonarCloud needs blame to tell new code from old
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+      - name: SonarCloud analysis (settings in sonar-project.properties)
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+  images:
+    # Only for version tags, and only once every test job has passed.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [backend, frontend, e2e]
+    runs-on: ubuntu-24.04
+    env:
+      # OCIR in Mumbai (ap-mumbai-1 = bom), tenancy namespace bmej3eov9wnf.
+      REGISTRY: bom.ocir.io/bmej3eov9wnf/umless
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: backend
+            context: backend
+          - image: frontend
+            context: frontend
+          - image: gateway
+            context: deploy/nginx
+          - image: backup
+            context: backup
+    steps:
+      - uses: actions/checkout@v4
+      # The server is an Ampere (ARM) VM: build linux/arm64 under emulation (private repo,
+      # so GitHub's native ARM runners aren't free).
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: bom.ocir.io
+          username: ${{ secrets.OCIR_USERNAME }}
+          password: ${{ secrets.OCIR_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.image }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ github.sha }}
+          build-args: |
+            CLERK_PUBLISHABLE_KEY=${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

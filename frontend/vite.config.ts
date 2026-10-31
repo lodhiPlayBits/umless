@@ -20,6 +20,13 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
       exclude: ['**/node_modules/**', 'tests/e2e/**'],
+      // `npm test -- --coverage` (CI): lcov for SonarCloud, with paths from the repo root.
+      coverage: {
+        provider: 'v8',
+        include: ['src/**/*.{ts,tsx}'],
+        exclude: ['src/shared/api/generated/**', 'src/**/*.test.{ts,tsx}', 'src/test/**'],
+        reporter: [['lcov', { projectRoot: '..' }], 'text-summary'],
+      },
     },
   }
 })

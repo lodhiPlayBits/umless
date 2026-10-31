@@ -3,8 +3,9 @@
 #   sg docker -c 'sh ~/umless/umless/deploy/deploy.sh v1.2.0'
 #
 # Refuses if the checkout has local changes: what runs is always a pushed, tagged commit.
-# Backs up the database, tags the running images for rollback, builds and starts the new
-# ones, then checks the site. If the check fails it rolls back by itself.
+# Pulls the images CI built for that tag from OCIR (the server never builds), backs up the
+# database, tags the running images for rollback, starts the new ones, then checks the site.
+# If the check fails it rolls back by itself. Needs `docker login bom.ocir.io` once.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -24,6 +25,20 @@ echo "Deploying $tag (was $previous)."
 cd deploy
 . ./.env
 stamp=$(date -u +%Y%m%d-%H%M%S)
+registry=${UMLESS_REGISTRY:-bom.ocir.io/bmej3eov9wnf/umless}
+# OCIR repository:local image name. The compose files use the local names, so CI's images are
+# pulled, then tagged with those; nothing else about the stack changes.
+images="backend:umless-backend frontend:umless-frontend gateway:umless-gateway backup:umless-backup"
+
+echo "0/5 Pull $tag from $registry"
+# Before anything is touched: a missing image (CI still running, or failed) stops here.
+for pair in $images; do
+    if ! docker pull --quiet "$registry/${pair%%:*}:$tag" >/dev/null; then
+        echo "Couldn't pull $registry/${pair%%:*}:$tag. Has CI's images job finished for $tag? Is the server logged in (docker login bom.ocir.io)?" >&2
+        cd .. && git checkout --quiet "$previous"
+        exit 1
+    fi
+done
 
 echo "1/5 Backup"
 docker exec umless-backup python3 backup.py once
@@ -35,12 +50,15 @@ for pair in umless-backend:umless-backend umless-frontend:umless-frontend umless
     docker tag "$(docker inspect -f '{{.Image}}' "$container")" "$image:rollback-$stamp"
 done
 
-echo "3/5 Build"
-docker compose build backend frontend nginx backup
+echo "3/5 Use the pulled images"
+for pair in $images; do
+    docker tag "$registry/${pair%%:*}:$tag" "${pair#*:}:latest"
+done
 
 echo "4/5 Start"
-# Only the built services: certbot and redis keep running. The backend runs migrations on start.
-docker compose up -d --no-build --no-deps backend frontend backup
+# Only these services: certbot and redis keep running. --force-recreate, because re-tagging
+# :latest isn't always seen as a change. The backend runs migrations on start.
+docker compose up -d --no-build --no-deps --force-recreate backend frontend backup
 healthy=no
 i=0
 while [ "$i" -lt 60 ]; do
@@ -49,8 +67,7 @@ while [ "$i" -lt 60 ]; do
     if [ "$b" = healthy ] && [ "$f" = healthy ]; then healthy=yes; break; fi
     i=$((i + 1)); sleep 2
 done
-docker compose up -d --no-build --no-deps nginx
-docker compose restart nginx
+docker compose up -d --no-build --no-deps --force-recreate nginx
 
 echo "5/5 Check"
 sleep 3

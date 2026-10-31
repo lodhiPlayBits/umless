@@ -15,6 +15,11 @@ __pycache__/
 node_modules/
 dist/
 
+# Coverage reports (CI uploads them to SonarCloud)
+coverage/
+coverage.xml
+.coverage
+
 # Runtime data (questions.json etc.)
 backend/data/
 

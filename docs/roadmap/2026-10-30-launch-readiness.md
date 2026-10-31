@@ -124,6 +124,16 @@ Order: 1 first (live money was at risk). Phase 0 is deferred to just before laun
     - push, so CI runs once;
     - branch protection on `main`/`develop` requiring `backend`, `frontend` and `e2e`;
     - the first tagged deploy with the script.
+- 2026-10-31: **Phase 6: SonarCloud and OCIR added** (your request).
+  - CI job `sonar` (SonarCloud, `sonar-project.properties`), fed by coverage from `pytest-cov` and `@vitest/coverage-v8` (local run: backend 85% without the MySQL/Redis tests, frontend 87.4%).
+  - CI job `images` (version tags only, after the tests): `linux/arm64` under QEMU (private repo), pushed to `bom.ocir.io/bmej3eov9wnf/umless/{backend,frontend,gateway,backup}`.
+  - The frontend Dockerfile takes `CLERK_PUBLISHABLE_KEY` as a build argument; without it, `frontend/.env` still applies. Both cases tested with throwaway builds.
+  - `deploy.sh` now pulls and re-tags instead of building; a failed pull stops before anything changes. `UMLESS_REGISTRY` is in `deploy/.env`.
+  - **Left (you):**
+    - GitHub secrets `OCIR_USERNAME`, `OCIR_TOKEN`, `SONAR_TOKEN` and the variable `VITE_CLERK_PUBLISHABLE_KEY`;
+    - SonarCloud import (check the keys; Automatic Analysis off);
+    - `docker login bom.ocir.io` on the server.
+- 2026-10-31: The server is logged in to OCIR (`Login Succeeded`) as `bmej3eov9wnf/Default/gauravlodhi983@gmail.com`; this tenancy needs the `Default` domain in the username. Secrets `OCIR_USERNAME`, `OCIR_TOKEN` and `SONAR_TOKEN` are set on GitHub.
 
 ## Phases
 

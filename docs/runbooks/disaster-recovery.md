@@ -51,6 +51,13 @@ mkdir -p ~/umless && cd ~/umless && git clone https://github.com/lodhiPlayBits/u
 cd umless && git checkout main   # or the release tag you last deployed
 ```
 
+## 3b. Log in to OCIR
+
+The server pulls the images CI built (`docs/runbooks/deploys.md`). The auth token is in the password manager, or generate a new one in the OCI console:
+```bash
+sg docker -c 'docker login bom.ocir.io -u "bmej3eov9wnf/Default/gauravlodhi983@gmail.com"'
+```
+
 ## 4. The secrets
 
 Recreate the six `.env` files from the password manager, at the paths above. Then make them private:
@@ -70,6 +77,8 @@ cd ~/umless/umless/deploy
 sg docker -c 'docker compose up -d --build'
 sg docker -c 'sh init-letsencrypt.sh'
 ```
+
+`--build` builds from the checkout, which is fine to get running again. Afterwards, `deploy.sh <latest tag>` swaps in the exact images CI built.
 
 The stack first starts with a self-signed certificate; `init-letsencrypt.sh` replaces it with a Let's Encrypt one. The backend runs its database migrations on start.
 
