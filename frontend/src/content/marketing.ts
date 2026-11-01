@@ -6,7 +6,7 @@ import { FREE_MINUTES, PRICING } from './business'
 
 /** The default meta description (index.html has the same text for the first paint). */
 export const SITE_DESCRIPTION =
-  'Practise interview answers out loud. umless shows every um, uh and long pause in your transcript, with your pace.'
+  'Practise speaking out loud: mock interviews, presentations, speeches and pitches. umless shows every um, uh and long pause in your transcript, with your pace.'
 
 export type FeatureItem = { icon: IconName; title: string; body: string }
 export type FaqItem = { question: string; answer: string }
@@ -17,15 +17,15 @@ export const SAMPLE_TRANSCRIPT =
 
 export const HERO = {
   badge: 'Pause dots show where you hesitate',
-  lead: 'Practise interview answers out loud. umless records you, then shows every um, uh and long pause, with your pace, so you hear what your interviewer hears.',
+  lead: 'Practise anything you have to say out loud: an interview answer, a presentation, a speech, a pitch. umless records you, then shows every um, uh and long pause, with your pace, so you hear what your audience hears.',
   note: `${FREE_MINUTES} free minutes, no card needed.`,
   mockQuestion: 'Tell me about a time you led a project.',
   mockSummary: ['1:42 total', '138 wpm', 'um ×2 · uh ×1', '2 pauses · longest 3 s'],
 }
 
 export const STEPS: FeatureItem[] = [
-  { icon: 'list', title: 'Add your questions', body: 'Type the questions you expect, or start with one of our examples.' },
-  { icon: 'mic', title: 'Answer out loud', body: "Press record and answer like it's the real thing. Up to 10 minutes." },
+  { icon: 'list', title: "Add what you'll say", body: 'An interview question, a presentation opener, a speech, a pitch. Type your own, or start with one of our examples.' },
+  { icon: 'mic', title: 'Say it out loud', body: "Press record and say it like it's the real thing. Up to 10 minutes." },
   { icon: 'highlight', title: 'See every um', body: 'Get a transcript with fillers highlighted, pauses marked and your pace.' },
 ]
 
@@ -65,6 +65,10 @@ export const WORKS_ANYWHERE: FeatureItem[] = [
 ]
 
 export const FAQ: FaqItem[] = [
+  {
+    question: 'What can I practise?',
+    answer: 'Anything you say out loud: mock interview answers, presentations, speeches, pitches, vivas and video scripts, in English. One recording can be up to 10 minutes, so practise long talks in sections.',
+  },
   { question: 'Which filler words does umless catch?', answer: 'um, uh and mhmm. "Uh-huh" and "uh-uh" mean yes and no, so they count as ordinary words.' },
   { question: 'What do the dots in my transcript mean?', answer: 'Each dot is one second of silence. A pause of three seconds shows as three dots.' },
   {
