@@ -2,7 +2,7 @@ import { UserButton } from '@clerk/react'
 import { navRoutes, routeById } from '@/app/routes'
 import { useSession } from '@/shared/lib/session'
 import { PracticeTime, PracticeTimeCard } from '@/features/billing'
-import { HOME_PATH } from '@/shared/config/paths'
+import { HOME_PATH, PATHS } from '@/shared/config/paths'
 import { ThemeToggle } from '@/shared/theme'
 import { Icon, Link } from '@/shared/ui'
 import Logo from './Logo'
@@ -53,9 +53,15 @@ export default function AppShell({ route, children }: LayoutProps) {
         <main className="shell-content" data-width={route.width ?? 'content'}>
           {children}
         </main>
+        {/* Phones: the tab bar holds only the main 5 tabs, so the rest of the sidebar lives here. */}
+        <nav aria-label="Help" className="shell-help">
+          <Link to={PATHS.policies}>Policies</Link>
+          <span aria-hidden="true">·</span>
+          <Link to="/contact">Contact</Link>
+        </nav>
       </div>
       <nav aria-label="App" className="shell-tabbar">
-        {nav.map((item) => (
+        {nav.filter((item) => item.nav!.phone !== false).map((item) => (
           <Link key={item.id} to={item.pattern} aria-current={current(item.id)}>
             <Icon name={item.nav!.icon} />
             {item.nav!.label}

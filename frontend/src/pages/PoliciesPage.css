@@ -1,0 +1,2 @@
+.policies-page { display: grid; gap: var(--space-4); max-width: 44rem; }
+.policies-page h1 { margin: 0; }

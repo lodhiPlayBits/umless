@@ -52,6 +52,8 @@
 .shell-tabbar a { display: grid; justify-items: center; gap: 2px; min-height: 56px; padding: 8px 0 6px; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--color-text-muted); text-decoration: none; }
 .shell-tabbar a[aria-current="page"] { color: var(--color-primary); }
 @media (min-width: 960px) { .shell-tabbar { display: none; } }
+.shell-help { display: flex; justify-content: center; gap: var(--space-2); padding: var(--space-4) var(--space-4) calc(56px + var(--space-6)); color: var(--color-text-muted); font-size: var(--text-sm); }
+@media (min-width: 960px) { .shell-help { display: none; } }
 
 /* Keep sticky actions and toasts above the phone tab bar (E21 in docs/design/flows.md). */
 @media (max-width: 959px) {

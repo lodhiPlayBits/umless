@@ -29,7 +29,8 @@ export type RouteDef = {
   params?: Params
   page: ComponentType<PageProps>
   /** Listed in the app's sidebar and phone tab bar, in `order`. */
-  nav?: { label: string; icon: IconName; order: number }
+  /** In the app's sidebar. `phone: false` keeps it out of the phone tab bar (too narrow for more than 5). */
+  nav?: { label: string; icon: IconName; order: number; phone?: false }
   /** The route this one sits under: the top bar shows it as a breadcrumb, and its nav item stays current. */
   parent?: string
   /** App pages: 'content' keeps the 720 px reading width, 'wide' uses the app width. */
@@ -50,6 +51,7 @@ const HistoryPage = lazy(() => import('@/pages/HistoryPage'))
 const QuestionHistoryPage = lazy(() => import('@/pages/QuestionHistoryPage'))
 const TakePage = lazy(() => import('@/pages/TakePage'))
 const LegalDocumentPage = lazy(() => import('@/pages/LegalDocumentPage'))
+const PoliciesPage = lazy(() => import('@/pages/PoliciesPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 
 /**
@@ -150,15 +152,28 @@ export const ROUTES: readonly RouteDef[] = [
     params: { tab: 'billing' },
     width: 'wide',
   },
+  {
+    id: 'policies',
+    pattern: PATHS.policies,
+    access: 'public',
+    layout: 'auto',
+    title: 'Policies',
+    page: PoliciesPage,
+    nav: { label: 'Policies', icon: 'shield', order: 85, phone: false },
+  },
+  // Public (payment providers must read them signed out); 'auto' keeps signed-in users inside the app.
   ...LEGAL_PAGES.map(
     (legal): RouteDef => ({
       id: `legal-${legal.id}`,
       pattern: `/${legal.id}`,
       access: 'public',
-      layout: 'marketing',
+      layout: 'auto',
       title: legal.title,
       params: { page: legal.id },
       page: LegalDocumentPage,
+      ...(legal.id === 'contact'
+        ? { nav: { label: 'Contact', icon: 'mail', order: 87, phone: false } }
+        : { parent: 'policies' }),
     }),
   ),
   // Dev-only living style guide; import.meta.env.DEV is false in production, so this row and its chunk are dropped.

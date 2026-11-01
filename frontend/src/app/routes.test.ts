@@ -63,8 +63,11 @@ describe('route table', () => {
   })
 
   it('lists the nav in order; every nav route is an app page', () => {
-    expect(navRoutes().map((r) => r.id)).toEqual(['dashboard', 'questions', 'history', 'purchases', 'settings'])
-    for (const route of navRoutes()) expect(route.layout).toBe('app')
+    expect(navRoutes().map((r) => r.id)).toEqual(['dashboard', 'questions', 'history', 'purchases', 'policies', 'legal-contact', 'settings'])
+    // Signed in, every sidebar tab renders inside the app ('auto' follows the session).
+    for (const route of navRoutes()) expect(['app', 'auto']).toContain(route.layout)
+    // The phone tab bar keeps the main 5.
+    expect(navRoutes().filter((r) => r.nav!.phone !== false)).toHaveLength(5)
   })
 
   it('every parent exists', () => {
