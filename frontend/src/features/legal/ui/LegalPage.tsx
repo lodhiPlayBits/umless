@@ -89,8 +89,12 @@ const PAGES: Record<LegalPageId, ReactNode> = {
           UPI or bank details go only to Razorpay.
         </li>
         <li>
-          <strong>Technical data:</strong> standard server logs (IP address, browser, time of request), kept for
-          security and troubleshooting.
+          <strong>Payments and refunds:</strong> refunds you request, with Razorpay's refund id.
+        </li>
+        <li>
+          <strong>Technical data:</strong> standard server logs (IP address, browser, time of request) and, for each
+          transcription, your account id, its length and word count (never the words themselves), kept for security,
+          abuse prevention and troubleshooting. To stop abuse we also count transcriptions per account for one hour.
         </li>
       </ul>
       <h2>Your recordings</h2>
@@ -108,13 +112,19 @@ const PAGES: Record<LegalPageId, ReactNode> = {
       <ul>
         <li>Clerk (sign-in and accounts)</li>
         <li>Deepgram (transcription)</li>
-        <li>Oracle Cloud Infrastructure, Mumbai region (our servers, database and file storage)</li>
-        <li>Razorpay (payments)</li>
+        <li>Oracle Cloud Infrastructure, Mumbai region (our servers, database, file storage and backups)</li>
+        <li>Razorpay (payments and refunds)</li>
       </ul>
+      <p>
+        Clerk and Deepgram may process your data outside India, under their own security and privacy commitments. Each
+        receives only what it needs for its part of the service.
+      </p>
       <h2>How long we keep it</h2>
       <p>
-        Questions and transcripts are kept until you delete them or your account. Payment records are kept as long as
-        Indian tax and accounting law requires.
+        Questions and transcripts are kept until you delete them or your account. We back up our database every night
+        and keep each backup for 30 days, so something you delete is gone from our backups within 30 days. Server logs
+        are kept for a few weeks at most. Payment and refund records are kept as long as Indian tax and accounting law
+        requires.
       </p>
       <h2>Your rights</h2>
       <p>
@@ -131,10 +141,14 @@ const PAGES: Record<LegalPageId, ReactNode> = {
       <h2>Refunds</h2>
       <ul>
         <li>
-          A pack you haven't used at all can be refunded in full if you ask within <strong>7 days</strong> of buying
-          it.
+          You can get a full refund for a pack within <strong>3 days</strong> of buying it, as long as you haven't used
+          any paid practice time since you bought it.
         </li>
-        <li>Packs that have been partly or fully used are not refundable.</li>
+        <li>
+          Once you use any of it, the pack can't be refunded. That includes the 5-session pack: if you use even one
+          session (or part of one), none of it can be refunded.
+        </li>
+        <li>Your free transcriptions don't count: using them doesn't affect a refund.</li>
         <li>
           If you were charged but didn't get your practice time, or were charged twice, we refund the extra payment in
           full, whenever you tell us.
@@ -142,13 +156,16 @@ const PAGES: Record<LegalPageId, ReactNode> = {
       </ul>
       <h2>How to ask</h2>
       <p>
-        Write to {email} from the email address of your umless account, with the date of purchase and, if you have it,
-        the Razorpay payment id from your receipt. We reply within 2 working days.
+        Go to Settings → Billing → Purchases and press <strong>Request refund</strong> next to the purchase. The button
+        is there only while the purchase qualifies. For anything else, write to {email} from the email address of your
+        umless account, with the date of purchase and, if you have it, the Razorpay payment id. We reply within 2
+        working days.
       </p>
       <h2>When the money arrives</h2>
       <p>
-        Approved refunds are sent back to the original payment method through Razorpay within 5–7 working days. Your
-        bank may take a few more days to show it. The refunded practice time is removed from your account.
+        The pack's practice time is removed from your account as soon as you request the refund. Razorpay sends the
+        money back to your original payment method within 5–7 working days; your bank may take a few more days to show
+        it.
       </p>
       <h2>Cancellation</h2>
       <p>
@@ -167,7 +184,10 @@ const PAGES: Record<LegalPageId, ReactNode> = {
         </li>
         {BUSINESS.address && <li>Address: {BUSINESS.address}</li>}
       </ul>
-      <p>We reply to emails within 2 working days, Monday to Saturday.</p>
+      <p>
+        We reply to emails within 2 working days, Monday to Saturday. For complaints and suggestions you can also use the
+        form below.
+      </p>
       <h2>Pricing</h2>
       <Pricing />
     </>

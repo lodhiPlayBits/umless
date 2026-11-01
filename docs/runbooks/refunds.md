@@ -1,13 +1,13 @@
 # Runbook: refunds
 
 Published policy (`/legal/refunds`):
-- **Unused pack, asked within 7 days of buying:** full refund.
-- **Partly or fully used pack:** no refund.
+- **Within 3 days of buying, and no paid practice time used since:** full refund.
+- **Any paid time used after buying** (even one session of a 5-session pack): no refund. Free transcriptions don't count.
 - **Charged but no time credited, or charged twice:** refund the extra payment in full, any time.
 
 ## The normal path: self-serve (nothing for you to do)
 
-Since 2026-10-31 (`docs/roadmap/2026-10-31-self-serve-refunds.md`), customers refund unused packs themselves: Settings → Billing → Purchases → **Request refund**. The button only appears when the policy allows it: paid within 7 days, and the balance still covers the pack's time.
+Since 2026-10-31 (`docs/roadmap/2026-10-31-self-serve-refunds.md`), customers refund unused packs themselves: Settings → Billing → Purchases → **Request refund**. The button only appears when the policy allows it: paid within 3 days, and no paid time used since (`accounts.last_paid_use_at` is before the purchase; set on every paid charge since 2026-11-01).
 
 What happens:
 1. umless removes the pack's time and marks the purchase `refund_pending` ("Refund in progress").

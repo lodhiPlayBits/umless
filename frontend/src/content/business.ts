@@ -8,7 +8,7 @@ export const BUSINESS = {
   site: 'https://umless.in',
 }
 
-export const LAST_UPDATED = '28 October 2026'
+export const LAST_UPDATED = '1 November 2026'
 
 /**
  * The prices, in words. The server's price list (backend/app/billing/packs.py) is what's
@@ -20,8 +20,8 @@ export const FREE_TRANSCRIPTIONS = 3
 export const PRICING = {
   free: `${FREE_TRANSCRIPTIONS} free transcriptions for every new account`,
   packs: [
-    { name: '1 session', time: '60 minutes of recording time', price: '₹40', minutes: 60, rupees: 40 },
-    { name: '5 sessions', time: '300 minutes of recording time', price: '₹120', minutes: 300, rupees: 120 },
+    { name: '1 session', time: '60 minutes of recording time', price: '₹49', minutes: 60, rupees: 49 },
+    { name: '5 sessions', time: '300 minutes of recording time', price: '₹199', minutes: 300, rupees: 199 },
   ],
 }
 

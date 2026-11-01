@@ -92,7 +92,7 @@ def contract_schema(tmp_path_factory):
     """
     data_file = tmp_path_factory.mktemp("contract") / "q.json"
     # A high hourly cap, so fuzzed transcriptions never hit 429 (it has its own tests).
-    settings = Settings(transcriber="fake", data_file=data_file, transcriptions_per_hour=10**9)
+    settings = Settings(transcriber="fake", data_file=data_file, transcriptions_per_hour=10**9, contact_to="owner@example.com")
     app = require_sign_in(create_app(settings))
     repository = JsonFileQuestionRepository(data_file)
     app.dependency_overrides[get_question_repository] = lambda: repository
@@ -103,6 +103,10 @@ def contract_schema(tmp_path_factory):
     from tests.test_billing import FakeRazorpay
 
     app.state.razorpay = FakeRazorpay()
+    # A fake mailer, so fuzzed contact messages are "sent" (5xx counts as a contract failure).
+    from tests.test_contact import FakeMailer
+
+    app.state.mailer = FakeMailer()
     # Plenty of paid time, so fuzzed transcriptions never run out (402 has its own tests).
     billing = InMemoryBillingStore()
     billing.add_order(Order("order_contract", "user_alice", "session_5", 12000, 10**9, "created"))

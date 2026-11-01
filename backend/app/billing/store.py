@@ -2,7 +2,7 @@
 
 import math
 import threading
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
@@ -13,6 +13,9 @@ from app.billing.packs import FREE_TRANSCRIPTIONS, REFUND_DAYS
 class Balance:
     free_transcriptions_left: int
     seconds_left: int
+    # When paid time (not a free transcription) was last used, UTC as PAID_AT_FORMAT. A pack
+    # bought before then can't be refunded. Not part of equality: it's bookkeeping, not balance.
+    last_paid_use_at: str | None = field(default=None, compare=False)
 
     @property
     def can_transcribe(self) -> bool:
@@ -51,10 +54,14 @@ def charged_seconds(duration_seconds: float) -> int:
     return max(0, math.ceil(duration_seconds - 1e-9))
 
 
+USED_SINCE_BOUGHT = "Paid practice time has been used since this pack was bought, so it can't be refunded."
+
+
 def refund_refusal(order: Order, balance: Balance, now: datetime) -> str | None:
-    """Why a paid order can't be refunded now, or None if it can (the published policy: an
-    unused pack, within REFUND_DAYS of paying). Paid time is one pool, so a pack is unused
-    while the balance still covers all of its time."""
+    """Why a paid order can't be refunded now, or None if it can (the published policy: within
+    REFUND_DAYS of paying, and no paid time used since; one session of a 5-session pack is
+    enough to lose the refund). Paid time is one pool, so the test is *when* it was last used,
+    not how much is left; free transcriptions don't count."""
     if order.status == "refund_pending":
         return "A refund for this purchase is already in progress."
     if order.status == "refunded":
@@ -63,8 +70,11 @@ def refund_refusal(order: Order, balance: Balance, now: datetime) -> str | None:
         return "This order was never paid for."
     if now - datetime.strptime(order.paid_at, PAID_AT_FORMAT) > timedelta(days=REFUND_DAYS):
         return f"This pack was bought more than {REFUND_DAYS} days ago, so it can't be refunded."
+    if balance.last_paid_use_at and balance.last_paid_use_at >= order.paid_at:
+        return USED_SINCE_BOUGHT
+    # Also for use from before last_paid_use_at was recorded (2026-11-01).
     if balance.seconds_left < order.seconds:
-        return "Some of this pack's practice time has been used, so it can't be refunded."
+        return USED_SINCE_BOUGHT
     return None
 
 
@@ -124,10 +134,14 @@ class InMemoryBillingStore:
         self._lock = threading.Lock()
         self._balances: dict[str, Balance] = {}
         self._orders: dict[str, Order] = {}
+        self._last_paid_use: dict[str, str] = {}
+
+    def _balance(self, user_id: str) -> Balance:
+        return replace(self._balances.get(user_id, NEW_ACCOUNT), last_paid_use_at=self._last_paid_use.get(user_id))
 
     def balance(self, user_id: str) -> Balance:
         with self._lock:
-            return self._balances.get(user_id, NEW_ACCOUNT)
+            return self._balance(user_id)
 
     def charge(self, user_id: str, duration_seconds: float) -> Balance:
         with self._lock:
@@ -136,8 +150,10 @@ class InMemoryBillingStore:
                 new = replace(current, free_transcriptions_left=current.free_transcriptions_left - 1)
             else:
                 new = replace(current, seconds_left=max(0, current.seconds_left - charged_seconds(duration_seconds)))
+                if charged_seconds(duration_seconds) > 0:
+                    self._last_paid_use[user_id] = utc_now().strftime(PAID_AT_FORMAT)
             self._balances[user_id] = new
-            return new
+            return self._balance(user_id)
 
     def add_order(self, order: Order) -> None:
         with self._lock:
@@ -177,7 +193,7 @@ class InMemoryBillingStore:
     def start_refund(self, order_id: str) -> Order:
         with self._lock:
             order = self._orders[order_id]
-            reason = refund_refusal(order, self._balances.get(order.user_id, NEW_ACCOUNT), utc_now())
+            reason = refund_refusal(order, self._balance(order.user_id), utc_now())
             if reason:
                 raise RefundRefused(reason)
             self._add_seconds(order.user_id, -order.seconds)

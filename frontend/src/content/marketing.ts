@@ -84,7 +84,7 @@ export const PRICING_FAQ: FaqItem[] = [
   { question: 'What if no words are heard?', answer: "Then it isn't charged: a recording with no words doesn't use a free transcription or any time." },
   { question: 'Does practice time expire?', answer: 'No. Time you buy stays on your account until you use it.' },
   { question: 'How can I pay?', answer: 'UPI, cards, net banking and wallets, through Razorpay. We never see your card, UPI or bank details.' },
-  { question: 'Can I get a refund?', answer: 'Yes, for a pack you haven\'t used, within 7 days of buying it. See the Refund & Cancellation Policy for the details.' },
+  { question: 'Can I get a refund?', answer: 'Yes, within 3 days of buying a pack, if you haven\'t used any of its practice time: one click in Settings → Billing. Once you use any of it (even one session of a 5-session pack), it can\'t be refunded. See the Refund & Cancellation Policy.' },
 ]
 
 /** A comparison cell: text, or true for a tick. */

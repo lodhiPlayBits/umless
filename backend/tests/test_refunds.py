@@ -71,7 +71,7 @@ def test_an_unused_pack_is_refundable_and_the_refund_takes_the_time_back(client,
     validate(contract_schema, "requestRefund", response)
     assert (response.json()["status"], response.json()["refundable"]) == ("refund_pending", False)
     assert account(client)["seconds_left"] == 0
-    assert razorpay.refunds == [(f"pay_{order['order_id']}", 4000, {"order_id": order["order_id"], "user_id": "local"})]
+    assert razorpay.refunds == [(f"pay_{order['order_id']}", 4900, {"order_id": order["order_id"], "user_id": "local"})]
     [listed] = purchases(client)
     assert (listed["status"], listed["refundable"]) == ("refund_pending", False)
     validate(contract_schema, "listPurchases", client.get("/api/payments"))
@@ -100,8 +100,8 @@ def test_a_partly_used_pack_isnt_refundable(client, razorpay):
     assert razorpay.refunds == []
 
 
-@pytest.mark.parametrize("age, allowed", [(timedelta(days=7), True), (timedelta(days=7, seconds=1), False)])
-def test_the_seven_day_window(client, age, allowed):
+@pytest.mark.parametrize("age, allowed", [(timedelta(days=3), True), (timedelta(days=3, seconds=1), False)])
+def test_the_three_day_window(client, age, allowed):
     order, _ = pay(client)
     set_paid_at(client, order["order_id"], utc_now() - age)
 
@@ -109,7 +109,43 @@ def test_the_seven_day_window(client, age, allowed):
     response = refund(client, order["order_id"])
     assert response.status_code == (200 if allowed else 409)
     if not allowed:
-        assert response.json()["detail"] == "This pack was bought more than 7 days ago, so it can't be refunded."
+        assert response.json()["detail"] == "This pack was bought more than 3 days ago, so it can't be refunded."
+
+
+def test_using_any_paid_time_after_buying_makes_the_packs_non_refundable(client, razorpay):
+    # The policy: use even one session of a 5-session pack and it can't be refunded. Time is one
+    # pool, so a balance that still covers a pack isn't proof it's unused.
+    first, _ = pay(client, "session_1")
+    second, _ = pay(client, "session_5")
+    use_up_free(client)
+    assert transcribe(client).status_code == 200  # a few seconds of paid time
+
+    assert [p["refundable"] for p in purchases(client)] == [False, False]
+    for order in (first, second):
+        response = refund(client, order["order_id"])
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Paid practice time has been used since this pack was bought, so it can't be refunded."
+    assert razorpay.refunds == []
+
+
+def test_free_transcriptions_dont_count_as_using_a_pack(client):
+    order, _ = pay(client)
+    assert transcribe(client).status_code == 200  # one of the 3 free ones
+
+    assert purchases(client)[0]["refundable"] is True
+    assert refund(client, order["order_id"]).status_code == 200
+
+
+def test_paid_time_used_before_buying_doesnt_block_the_new_pack(client):
+    old, _ = pay(client, "session_1")
+    use_up_free(client)
+    transcribe(client)
+    set_paid_at(client, old["order_id"], utc_now() - timedelta(days=10))
+    client.app.state.billing._last_paid_use["local"] = (utc_now() - timedelta(minutes=5)).strftime(PAID_AT_FORMAT)
+
+    new, _ = pay(client, "session_1")
+
+    assert refund(client, new["order_id"]).status_code == 200
 
 
 def test_someone_elses_an_unknown_or_an_unpaid_order_is_404(client, razorpay):
@@ -151,19 +187,19 @@ def test_refund_processed_marks_a_pending_refund_refunded(client):
     order, _ = pay(client)
     refund(client, order["order_id"])
 
-    assert webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4000)).json() == {"status": "ok"}
+    assert webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4900)).json() == {"status": "ok"}
 
     assert purchases(client)[0]["status"] == "refunded"
     assert account(client)["seconds_left"] == 0
     # A repeat delivery changes nothing.
-    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4000))
+    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4900))
     assert account(client)["seconds_left"] == 0
 
 
 def test_a_refund_made_in_razorpays_dashboard_takes_the_time_back(client):
     order, _ = pay(client)
 
-    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4000))
+    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4900))
 
     assert purchases(client)[0]["status"] == "refunded"
     assert account(client)["seconds_left"] == 0
@@ -173,7 +209,7 @@ def test_refund_failed_puts_the_time_back(client, caplog):
     order, _ = pay(client)
     refund(client, order["order_id"])
 
-    webhook(client, refund_event("refund.failed", f"pay_{order['order_id']}", 4000))
+    webhook(client, refund_event("refund.failed", f"pay_{order['order_id']}", 4900))
 
     assert purchases(client)[0]["status"] == "paid"
     assert account(client)["seconds_left"] == 3600
@@ -193,9 +229,9 @@ def test_partial_or_unknown_refunds_are_left_alone(client):
 def test_a_late_payment_webhook_after_a_refund_credits_nothing(client):
     order, _ = pay(client)
     refund(client, order["order_id"])
-    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4000))
+    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4900))
 
-    webhook(client, captured(order["order_id"], 4000, payment_id=f"pay_{order['order_id']}"))
+    webhook(client, captured(order["order_id"], 4900, payment_id=f"pay_{order['order_id']}"))
 
     assert (purchases(client)[0]["status"], account(client)["seconds_left"]) == ("refunded", 0)
 
@@ -271,4 +307,6 @@ def test_sql_refund_window_and_used_time(mysql_engine, tmp_path):
 
     with pytest.raises(RefundRefused, match="has been used"):
         store.start_refund(order.id)
-    assert store.balance(user) == Balance(0, 3590)
+    balance = store.balance(user)
+    assert balance == Balance(0, 3590)
+    assert balance.last_paid_use_at >= store.get_order(order.id).paid_at

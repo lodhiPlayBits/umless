@@ -13,14 +13,20 @@ describe('LegalPage', () => {
 
   it('states the prices on the terms and contact pages', () => {
     render(<LegalPage page="terms" />)
-    expect(screen.getByText(/60 minutes of recording time for ₹40/)).toBeInTheDocument()
-    expect(screen.getByText(/300 minutes of recording time for ₹120/)).toBeInTheDocument()
+    expect(screen.getByText(/60 minutes of recording time for ₹49/)).toBeInTheDocument()
+    expect(screen.getByText(/300 minutes of recording time for ₹199/)).toBeInTheDocument()
   })
 
-  it('states the 7-day refund rule', () => {
+  it('states the 3-day refund rule and that any use ends it', () => {
     render(<LegalPage page="refunds" />)
-    expect(screen.getByText('7 days')).toBeInTheDocument()
-    expect(screen.getByText(/partly or fully used are not refundable/)).toBeInTheDocument()
+    expect(screen.getByText('3 days')).toBeInTheDocument()
+    expect(screen.getByText(/if you use even one session \(or part of one\), none of it can be refunded/)).toBeInTheDocument()
+    expect(screen.getByText(/free transcriptions don't count/)).toBeInTheDocument()
+  })
+
+  it('says how long backups keep data, on the privacy page', () => {
+    render(<LegalPage page="privacy" />)
+    expect(screen.getByText(/keep each backup for 30 days/)).toBeInTheDocument()
   })
 
   it('lists the phone number on the contact page', () => {

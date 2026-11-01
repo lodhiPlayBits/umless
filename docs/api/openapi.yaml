@@ -626,11 +626,12 @@ paths:
     post:
       operationId: requestRefund
       tags: [billing]
-      summary: Refund an unused pack bought in the last 7 days
+      summary: Refund an unused pack bought in the last 3 days
       description: |
         Self-serve refund under the published policy. Allowed when the purchase is `paid`, was
-        paid within the last 7 days, and the account's paid time still covers the pack's
-        time (it hasn't been used); `refundable` in listPurchases says the same. The pack's time
+        paid within the last 3 days, and no paid practice time has been used since it was bought
+        (using even one session of a 5-session pack ends the refund; free transcriptions don't
+        count); `refundable` in listPurchases says the same. The pack's time
         is removed at once and Razorpay is asked to refund the full amount; the purchase is
         then `refund_pending` until Razorpay's `refund.processed` webhook makes it `refunded`
         (or `refund.failed` puts the time back and makes it `paid` again). No request body.
@@ -658,15 +659,15 @@ paths:
                 detail: That payment order doesn't exist.
         '409':
           description: |
-            The policy doesn't allow it: already refunded or in progress, paid more than 7 days
-            ago, or some of the time has been used. `detail` says which.
+            The policy doesn't allow it: already refunded or in progress, paid more than 3 days
+            ago, or paid time has been used since it was bought. `detail` says which.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
                 code: refund_not_allowed
-                detail: This pack was bought more than 7 days ago, so it can't be refunded.
+                detail: This pack was bought more than 3 days ago, so it can't be refunded.
         '500':
           $ref: '#/components/responses/InternalError'
         '502':
@@ -680,6 +681,64 @@ paths:
                 detail: The refund couldn't be started. Your practice time is unchanged; try again later.
         '503':
           $ref: '#/components/responses/PaymentsUnavailable'
+
+  /api/contact:
+    post:
+      operationId: sendContactMessage
+      tags: [contact]
+      summary: Send a complaint, suggestion or other message to umless
+      description: |
+        Emails the message to the umless inbox (through Resend), with the given email address as
+        Reply-To so the reply goes straight to the sender. Plain text only. At most 5 messages per
+        user per hour (429). Signed-out visitors use the email address on the Contact page instead.
+      x-screen:
+        - contact / send message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactMessage'
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '204':
+          description: Sent.
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: Too many messages from this user this hour.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: rate_limited
+                detail: You've sent a lot of messages this hour. Try again later, or email us.
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          description: The email provider couldn't be reached or refused the message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: contact_failed
+                detail: Your message couldn't be sent. Try again in a moment, or email us.
+        '503':
+          description: This server has no email provider set up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: contact_unavailable
+                detail: The contact form isn't set up on this server. Email us instead.
 
   /api/payments/webhook:
     post:
@@ -1287,12 +1346,12 @@ components:
           - id: session_1
             label: 1 session · 60 minutes
             seconds: 3600
-            amount_paise: 4000
+            amount_paise: 4900
             currency: INR
           - id: session_5
             label: 5 sessions · 300 minutes
             seconds: 18000
-            amount_paise: 12000
+            amount_paise: 19900
             currency: INR
 
     PaymentOrderCreate:
@@ -1347,19 +1406,48 @@ components:
         refundable:
           type: boolean
           description: >-
-            Whether requestRefund would accept it now: `paid`, paid within the last 7 days, and
-            the account's paid time still covers its time.
+            Whether requestRefund would accept it now: `paid`, paid within the last 3 days, and
+            no paid time used since it was bought.
       example:
         order_id: order_Tu3l5LvVnBJXfu
         payment_id: pay_Tu3lhmtObPkSdy
         pack_id: session_1
         label: 1 session · 60 minutes
         seconds: 3600
-        amount_paise: 4000
+        amount_paise: 4900
         currency: INR
         paid_at: '2026-10-30T08:50:46Z'
         status: paid
         refundable: true
+
+    ContactMessage:
+      type: object
+      additionalProperties: false
+      required: [kind, name, email, message]
+      properties:
+        kind:
+          type: string
+          enum: [complaint, suggestion, other]
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: '^[^\x00-\x1f\x7f]*\S[^\x00-\x1f\x7f]*$'
+          description: One line, not blank.
+        email:
+          type: string
+          maxLength: 254
+          pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+          description: Where the reply goes (Reply-To).
+        message:
+          type: string
+          minLength: 10
+          maxLength: 5000
+      example:
+        kind: suggestion
+        name: Asha
+        email: asha@example.com
+        message: Could the summary also show how my pace changed over the week?
 
     PurchaseList:
       type: object
@@ -1439,6 +1527,8 @@ components:
         - payment_provider_failed
         - payments_unavailable
         - refund_not_allowed
+        - contact_unavailable
+        - contact_failed
         - not_found
         - method_not_allowed
         - empty_audio

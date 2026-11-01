@@ -80,6 +80,10 @@ Fix: credit **only** orders whose status is `created`.
   - `order_TucPrFmp8XFnAQ` (₹40, account `user_3LTJh11…`): refund `rfnd_TucQgqnRvy1Bw6` requested at 18:44:53; `refund.processed` arrived at 18:45:27 and the order was marked `refunded`.
   - The first try, on a 28 Oct purchase, got Razorpay 400 "The id provided does not exist". It was a **test-mode** payment from before the live keys. The failure path worked: time back, 502, ERROR logged.
   - Those test-mode orders show "Request refund" until 4 Nov (7 days) and fail safely. They're only on the owner's accounts, so they're left as they are.
+- 2026-11-01: **Policy tightened** (owner): **3 days** instead of 7, and **any** paid use after buying ends the refund (one session of a 5-session pack is enough). Before, a pack counted as unused while the balance covered it, which let someone with 2 packs use some time and still refund one.
+  - Now `accounts.last_paid_use_at` (migration 0006) is set on every paid charge, and packs bought before it can't be refunded.
+  - Tests: two packs then a few paid seconds → neither refundable; free transcriptions don't count; use before buying doesn't block a new pack; the 3-day edge.
+  - Prices changed in the same release: ₹49 / ₹199.
 
 ## Design
 
