@@ -5,7 +5,7 @@ import type { ContactMessage } from '../api/contactApi'
 export const NAME_MAX = 100
 export const MESSAGE_MIN = 10
 export const MESSAGE_MAX = 5000
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+const EMAIL = /^[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/
 
 export type ContactErrors = Partial<Record<'name' | 'email' | 'message', string>>
 

@@ -1432,13 +1432,13 @@ components:
           type: string
           minLength: 1
           maxLength: 100
-          pattern: '^[^\x00-\x1f\x7f]*\S[^\x00-\x1f\x7f]*$'
-          description: One line, not blank.
+          pattern: '^[^\x00-\x1f\x7f-\x9f]*[^\x00-\x20\x7f-\x9f][^\x00-\x1f\x7f-\x9f]*$'
+          description: One line, no control characters, not blank.
         email:
           type: string
           maxLength: 254
-          pattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
-          description: Where the reply goes (Reply-To).
+          pattern: '^[A-Za-z0-9.!#$%&''*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$'
+          description: Where the reply goes (Reply-To). ASCII, name@domain.tld.
         message:
           type: string
           minLength: 10
