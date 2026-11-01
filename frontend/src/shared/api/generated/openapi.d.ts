@@ -106,10 +106,12 @@ export interface paths {
          *     response's `take_id` names it. If saving fails the transcript is still returned, with
          *     `take_id: null`.
          *
-         *     On a metered server (getAccount `metered`), the user needs a free transcription or paid
-         *     time left, checked before Deepgram is called (otherwise 402). A transcript with words
-         *     then uses one free transcription, or deducts its length (rounded up to a second) from
-         *     paid time, never below zero. A transcript with no words is free.
+         *     On a metered server (getAccount `metered`), the server first measures the recording's
+         *     length itself and refuses, before Deepgram is called, audio it can't read
+         *     (`unreadable_audio`), recordings over 10 minutes (`recording_too_long`) and recordings
+         *     longer than the user's free plus paid time left (402). A transcript with words then
+         *     deducts exactly the measured length, rounded up to a second: free minutes first, then
+         *     paid time. A transcript with no words is free.
          *
          *     Each user runs one transcription at a time (another while one runs: 409) and at most a
          *     set number each clock hour, 30 by default (over it: 429). Both are checked before
@@ -280,7 +282,7 @@ export interface paths {
          * Refund an unused pack bought in the last 3 days
          * @description Self-serve refund under the published policy. Allowed when the purchase is `paid`, was
          *     paid within the last 3 days, and no paid practice time has been used since it was bought
-         *     (using even one session of a 5-session pack ends the refund; free transcriptions don't
+         *     (using even one session of a 5-session pack ends the refund; free minutes don't
          *     count); `refundable` in listPurchases says the same. The pack's time
          *     is removed at once and Razorpay is asked to refund the full amount; the purchase is
          *     then `refund_pending` until Razorpay's `refund.processed` webhook makes it `refunded`
@@ -668,7 +670,7 @@ export interface components {
         /**
          * @example {
          *       "metered": true,
-         *       "free_transcriptions_left": 0,
+         *       "free_seconds_left": 0,
          *       "seconds_left": 3540,
          *       "packs": [
          *         {
@@ -691,7 +693,8 @@ export interface components {
         Account: {
             /** @description False on a server without payments (local use); then nothing is counted. */
             metered: boolean;
-            free_transcriptions_left: number;
+            /** @description Free practice time left (every account starts with 5400, i.e. 90 minutes); used before paid time. */
+            free_seconds_left: number;
             /** @description Paid practice time left. */
             seconds_left: number;
             /** @description What can be bought; empty when not metered. */
@@ -788,7 +791,7 @@ export interface components {
          * @example validation_error
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "refund_not_allowed" | "contact_unavailable" | "contact_failed" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
+        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "refund_not_allowed" | "unreadable_audio" | "recording_too_long" | "contact_unavailable" | "contact_failed" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
         /**
          * @example {
          *       "field": "text",
@@ -1148,8 +1151,9 @@ export interface operations {
                 };
             };
             /**
-             * @description The body was empty (`empty_audio`, shown as `practice-empty`), or the Host header is
-             *     not localhost/127.0.0.1 (`invalid_host`).
+             * @description The body was empty (`empty_audio`, shown as `practice-empty`); on a metered server the
+             *     audio couldn't be read (`unreadable_audio`) or is over 10 minutes long
+             *     (`recording_too_long`); or the Host header is not localhost/127.0.0.1 (`invalid_host`).
              */
             400: {
                 headers: {
@@ -1166,7 +1170,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            /** @description No free transcriptions or paid time left. */
+            /** @description Not enough free or paid time left for this recording; `detail` says how long it is and how much is left. */
             402: {
                 headers: {
                     [name: string]: unknown;
@@ -1175,7 +1179,7 @@ export interface operations {
                     /**
                      * @example {
                      *       "code": "payment_required",
-                     *       "detail": "You're out of practice time. Buy a session to keep going."
+                     *       "detail": "This recording is 6 min; you have 4 min left. Buy more practice time to transcribe it."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];

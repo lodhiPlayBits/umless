@@ -1,4 +1,4 @@
-"""Balances and payment orders. Paid time is in seconds; free transcriptions are a count."""
+"""Balances and payment orders. Free and paid time are both in seconds; free is used first."""
 
 import math
 import threading
@@ -6,20 +6,24 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
-from app.billing.packs import FREE_TRANSCRIPTIONS, REFUND_DAYS
+from app.billing.packs import FREE_SECONDS, REFUND_DAYS
 
 
 @dataclass(frozen=True)
 class Balance:
-    free_transcriptions_left: int
-    seconds_left: int
-    # When paid time (not a free transcription) was last used, UTC as PAID_AT_FORMAT. A pack
+    free_seconds_left: int  # the free trial's time; used before paid time
+    seconds_left: int  # paid time
+    # When paid time (not free time) was last used, UTC as PAID_AT_FORMAT. A pack
     # bought before then can't be refunded. Not part of equality: it's bookkeeping, not balance.
     last_paid_use_at: str | None = field(default=None, compare=False)
 
     @property
+    def total_seconds(self) -> int:
+        return self.free_seconds_left + self.seconds_left
+
+    @property
     def can_transcribe(self) -> bool:
-        return self.free_transcriptions_left > 0 or self.seconds_left > 0
+        return self.total_seconds > 0
 
 
 @dataclass(frozen=True)
@@ -37,7 +41,7 @@ class Order:
     refunded_at: str | None = None  # UTC, as paid_at
 
 
-NEW_ACCOUNT = Balance(FREE_TRANSCRIPTIONS, 0)
+NEW_ACCOUNT = Balance(FREE_SECONDS, 0)
 PAID_AT_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
@@ -57,11 +61,17 @@ def charged_seconds(duration_seconds: float) -> int:
 USED_SINCE_BOUGHT = "Paid practice time has been used since this pack was bought, so it can't be refunded."
 
 
+def split_charge(balance: Balance, seconds: int) -> tuple[int, int]:
+    """How many of `seconds` come from free time and how many from paid time (free first)."""
+    free = min(balance.free_seconds_left, seconds)
+    return free, seconds - free
+
+
 def refund_refusal(order: Order, balance: Balance, now: datetime) -> str | None:
     """Why a paid order can't be refunded now, or None if it can (the published policy: within
     REFUND_DAYS of paying, and no paid time used since; one session of a 5-session pack is
     enough to lose the refund). Paid time is one pool, so the test is *when* it was last used,
-    not how much is left; free transcriptions don't count."""
+    not how much is left; free time doesn't count."""
     if order.status == "refund_pending":
         return "A refund for this purchase is already in progress."
     if order.status == "refunded":
@@ -82,8 +92,8 @@ class BillingStore(Protocol):
     def balance(self, user_id: str) -> Balance: ...
 
     def charge(self, user_id: str, duration_seconds: float) -> Balance:
-        """Use a free transcription if any are left, else deduct the duration from paid time
-        (never below zero)."""
+        """Deduct the duration, rounded up to a second: free seconds first, then paid time (never
+        below zero). Using paid time sets last_paid_use_at."""
         ...
 
     def add_order(self, order: Order) -> None: ...
@@ -146,12 +156,10 @@ class InMemoryBillingStore:
     def charge(self, user_id: str, duration_seconds: float) -> Balance:
         with self._lock:
             current = self._balances.get(user_id, NEW_ACCOUNT)
-            if current.free_transcriptions_left > 0:
-                new = replace(current, free_transcriptions_left=current.free_transcriptions_left - 1)
-            else:
-                new = replace(current, seconds_left=max(0, current.seconds_left - charged_seconds(duration_seconds)))
-                if charged_seconds(duration_seconds) > 0:
-                    self._last_paid_use[user_id] = utc_now().strftime(PAID_AT_FORMAT)
+            free, paid = split_charge(current, charged_seconds(duration_seconds))
+            new = replace(current, free_seconds_left=current.free_seconds_left - free, seconds_left=max(0, current.seconds_left - paid))
+            if paid > 0:
+                self._last_paid_use[user_id] = utc_now().strftime(PAID_AT_FORMAT)
             self._balances[user_id] = new
             return self._balance(user_id)
 

@@ -434,7 +434,7 @@ describe('PracticeSession out of practice time', () => {
   afterEach(() => resetAccount())
 
   it('offers to buy time, then Try again on the same recording', async () => {
-    setAccount({ metered: true, free_transcriptions_left: 0, seconds_left: 0, packs: [] })
+    setAccount({ metered: true, free_seconds_left: 0, seconds_left: 0, packs: [] })
     const transcribe = vi.fn().mockRejectedValueOnce(new ApiError('x', 402, 'payment_required')).mockResolvedValue(transcript)
     const s = setup({ transcribe })
     await record(s)

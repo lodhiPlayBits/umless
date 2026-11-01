@@ -26,7 +26,7 @@ def engine(mysql_engine):
 
 def seed(engine, objects, user=OLD, free=1, seconds=3000):
     with engine.begin() as conn:
-        conn.execute(insert(accounts).values(user_id=user, free_transcriptions_left=free, seconds_left=seconds, created_at=NOW))
+        conn.execute(insert(accounts).values(user_id=user, free_transcriptions_left=0, free_seconds_left=free, seconds_left=seconds, created_at=NOW))
         conn.execute(insert(questions).values(id="q" * 36, user_id=user, position=0, text="Tell me about you", created_at=NOW))
         for take_id in ("a" * 36, "b" * 36):
             conn.execute(insert(takes).values(id=take_id, user_id=user, question_id="q" * 36, created_at=NOW, duration_seconds=5.0, summary={}))
@@ -45,7 +45,7 @@ def owners(engine, table):
 def account(engine, user):
     with engine.connect() as conn:
         row = conn.execute(select(accounts).where(accounts.c.user_id == user)).first()
-    return None if row is None else (row.free_transcriptions_left, row.seconds_left)
+    return None if row is None else (row.free_seconds_left, row.seconds_left)
 
 
 def test_a_dry_run_reports_and_changes_nothing(engine):
@@ -55,7 +55,7 @@ def test_a_dry_run_reports_and_changes_nothing(engine):
     report = move_user(engine, objects, OLD, NEW, apply=False)
 
     assert (report.questions, report.takes, report.orders) == (1, 2, 1)
-    assert report.balance == "1 free, 3000 s paid"
+    assert report.balance == "1 s free, 3000 s paid"
     for table in (questions, takes, payment_orders, accounts):
         assert owners(engine, table) == [OLD]
     assert objects.get(object_name(NEW, "a" * 36)) is None
@@ -79,7 +79,7 @@ def test_the_fresh_account_from_the_first_sign_in_is_merged_without_extra_free_o
     objects = InMemoryObjects()
     seed(engine, objects, free=1, seconds=3000)
     with engine.begin() as conn:  # created by the first sign-in on production
-        conn.execute(insert(accounts).values(user_id=NEW, free_transcriptions_left=3, seconds_left=0, created_at=NOW))
+        conn.execute(insert(accounts).values(user_id=NEW, free_transcriptions_left=0, free_seconds_left=5400, seconds_left=0, created_at=NOW))
 
     move_user(engine, objects, OLD, NEW, apply=True)
 

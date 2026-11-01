@@ -21,7 +21,7 @@ describe('LegalPage', () => {
     render(<LegalPage page="refunds" />)
     expect(screen.getByText('3 days')).toBeInTheDocument()
     expect(screen.getByText(/if you use even one session \(or part of one\), none of it can be refunded/)).toBeInTheDocument()
-    expect(screen.getByText(/free transcriptions don't count/)).toBeInTheDocument()
+    expect(screen.getByText(/free minutes don't count/)).toBeInTheDocument()
   })
 
   it('says how long backups keep data, on the privacy page', () => {

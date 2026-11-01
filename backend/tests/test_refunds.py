@@ -10,7 +10,7 @@ def test_a_late_payment_webhook_never_credits_a_refunded_order_again():
     for status in ("refund_pending", "refunded"):
         store.add_order(Order(f"order_{status}", "u", "session_1", 4000, 3600, status, "pay_1", "2026-10-30T08:50:46Z"))
 
-        assert store.mark_paid(f"order_{status}", "pay_1") == Balance(3, 0)
+        assert store.mark_paid(f"order_{status}", "pay_1") == Balance(5400, 0)
         assert store.get_order(f"order_{status}").status == status
 
 
@@ -128,9 +128,9 @@ def test_using_any_paid_time_after_buying_makes_the_packs_non_refundable(client,
     assert razorpay.refunds == []
 
 
-def test_free_transcriptions_dont_count_as_using_a_pack(client):
+def test_free_time_doesnt_count_as_using_a_pack(client):
     order, _ = pay(client)
-    assert transcribe(client).status_code == 200  # one of the 3 free ones
+    assert transcribe(client).status_code == 200  # from the 90 free minutes
 
     assert purchases(client)[0]["refundable"] is True
     assert refund(client, order["order_id"]).status_code == 200
@@ -276,20 +276,20 @@ def test_sql_refunds(mysql_engine, tmp_path):
 
     assert store.order_for_payment(payment_id).id == order.id
     pending = store.start_refund(order.id)
-    assert pending.status == "refund_pending" and store.balance(user) == Balance(3, 0)
+    assert pending.status == "refund_pending" and store.balance(user) == Balance(5400, 0)
     with pytest.raises(RefundRefused):
         store.start_refund(order.id)
     # The regression: a late payment webhook never credits it again.
-    assert store.mark_paid(order.id, payment_id) == Balance(3, 0)
+    assert store.mark_paid(order.id, payment_id) == Balance(5400, 0)
 
     store.refund_started(order.id, "rfnd_1")
     assert store.refund_failed(order.id) is True
-    assert (store.get_order(order.id).status, store.balance(user)) == ("paid", Balance(3, 3600))
+    assert (store.get_order(order.id).status, store.balance(user)) == ("paid", Balance(5400, 3600))
     assert store.refund_failed(order.id) is False
 
     assert store.refund_processed(order.id, "rfnd_2") == "paid"  # a dashboard refund
     done = store.get_order(order.id)
-    assert (done.status, done.refund_id, store.balance(user)) == ("refunded", "rfnd_2", Balance(3, 0))
+    assert (done.status, done.refund_id, store.balance(user)) == ("refunded", "rfnd_2", Balance(5400, 0))
     assert done.refunded_at.endswith("Z")
     assert store.refund_processed(order.id, "rfnd_2") == "refunded"
     assert [p.status for p in store.purchases(user)] == ["refunded"]
@@ -301,8 +301,7 @@ def test_sql_refund_window_and_used_time(mysql_engine, tmp_path):
     order = Order(f"order_w_{tmp_path.name}"[:64], user, "session_1", 4000, 3600, "created")
     store.add_order(order)
     store.mark_paid(order.id, f"pay_w_{tmp_path.name}"[:64])
-    for _ in range(3):
-        store.charge(user, 10)
+    store.charge(user, 5400)  # the free 90 minutes
     store.charge(user, 10)  # 10 s of paid time used
 
     with pytest.raises(RefundRefused, match="has been used"):

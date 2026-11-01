@@ -1,4 +1,4 @@
-import { FREE_TRANSCRIPTIONS, PRICING } from '@/content/business'
+import { FREE_MINUTES, PRICING } from '@/content/business'
 import { HOME_PATH, PATHS } from '@/shared/config/paths'
 import { useSession } from '@/shared/lib/session'
 import { Badge, ButtonLink, cx } from '@/shared/ui'
@@ -11,7 +11,7 @@ type Plan = { name: string; blurb: string; price: string; per: string; points: s
 function plans(): Plan[] {
   const best = PRICING.packs.reduce((a, b) => (b.rupees / b.minutes < a.rupees / a.minutes ? b : a))
   return [
-    { name: 'Free', blurb: 'To try it out.', price: '₹0', per: 'for every new account', points: [`${FREE_TRANSCRIPTIONS} free transcriptions`, ...INCLUDED] },
+    { name: 'Free', blurb: 'To try it out.', price: '₹0', per: 'for every new account', points: [`${FREE_MINUTES} free minutes`, ...INCLUDED] },
     ...PRICING.packs.map((pack) => ({
       name: pack.name.replace(/^\w/, (c) => c.toUpperCase()),
       blurb: pack === best ? 'For regular practice.' : 'For a few answers.',

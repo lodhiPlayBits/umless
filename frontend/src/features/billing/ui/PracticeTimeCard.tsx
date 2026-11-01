@@ -1,17 +1,17 @@
 import { Button } from '@/shared/ui'
-import { FREE_TRANSCRIPTIONS } from '@/content/business'
+import { FREE_MINUTES } from '@/content/business'
 import { practiceTimeLabel, useAccount } from '../model/account'
 import { useBuyTime } from './useBuyTime'
 import './PracticeTimeCard.css'
 
-/** Sidebar card: what's left to practise with, a bar for the free transcriptions, and Buy time. */
+/** Sidebar card: what's left to practise with, a bar for the free minutes, and Buy time. */
 export default function PracticeTimeCard({ className }: { className?: string }) {
   const { account } = useAccount()
   const buy = useBuyTime()
 
   if (!account?.metered) return null
-  const free = account.free_transcriptions_left
-  const freeMax = Math.max(FREE_TRANSCRIPTIONS, free)
+  const free = account.free_seconds_left
+  const freeMax = Math.max(FREE_MINUTES * 60, free)
   const label = practiceTimeLabel(account)
   return (
     <div className={`practice-time-card ${className ?? ''}`.trim()}>
@@ -23,7 +23,7 @@ export default function PracticeTimeCard({ className }: { className?: string }) 
         <div
           className="practice-time-card__bar"
           role="meter"
-          aria-label="Free transcriptions left"
+          aria-label="Free time left"
           aria-valuemin={0}
           aria-valuemax={freeMax}
           aria-valuenow={free}

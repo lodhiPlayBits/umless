@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.concurrency import run_in_threadpool
 
 from app.auth import get_user_id
+from app.billing.packs import MAX_RECORDING_SECONDS
 from app.billing.router import get_billing
-from app.billing.store import BillingStore
+from app.billing.store import BillingStore, charged_seconds
 from app.config import Settings
 from app.errors import ApiError
 from app.http import get_settings, media_type
@@ -15,6 +16,7 @@ from app.questions.router import get_question_repository, question_not_found
 from app.summary import transcript_body
 from app.takes.service import TakeHistory, get_take_history
 from app.transcription.deepgram import DeepgramTranscriber
+from app.transcription.duration import UnreadableAudio
 from app.transcription.fake import FakeTranscriber
 from app.transcription.models import DeepgramAccountError, Transcriber, TranscriptionError
 
@@ -128,6 +130,12 @@ async def transcribe_one(
     if not audio:
         raise ApiError(400, "empty_audio", "The recording is empty.")
 
+    # Metered: the server measures the recording itself and checks it against the limit and the
+    # time left, all before Deepgram is paid for it (docs/roadmap/2026-11-01-metered-free-time.md).
+    seconds = None
+    if billing is not None:
+        seconds = await measure_and_check(request, billing, user_id, audio)
+
     try:
         transcript = await transcriber.transcribe(audio, content_type)
         # OverflowError: Deepgram's timings make the summary rates infinite.
@@ -143,7 +151,7 @@ async def transcribe_one(
         ) from None
 
     if billing is not None and body["words"]:
-        await charge(billing, user_id, body)
+        await charge(billing, user_id, seconds)
     if question is not None:
         body["take_id"] = await save_take(get_take_history(request, user_id), question, body)
     # Counts and timings only: the transcript text never goes in the log.
@@ -158,11 +166,45 @@ async def transcribe_one(
     return body
 
 
-async def charge(billing: BillingStore, user_id: str, body: dict) -> None:
-    """Use a free transcription, or deduct the recording's length. Only takes with words are
-    charged. A failure is logged, not shown: the user already has the transcript."""
-    words = body["words"]
-    seconds = body["duration_seconds"] or (words[-1]["end"] if words else 0)
+def duration_text(seconds: float) -> str:
+    """"45 s", "1 min 1 s", "10 min", for the 402 message."""
+    whole = charged_seconds(seconds)
+    minutes, rest = divmod(whole, 60)
+    if not minutes:
+        return f"{rest} s"
+    return f"{minutes} min {rest} s" if rest else f"{minutes} min"
+
+
+async def measure_and_check(request: Request, billing: BillingStore, user_id: str, audio: bytes) -> float:
+    """The recording's length, once it's known to be readable, at most 10 minutes, and no longer
+    than the user's free plus paid time. Every refusal happens before Deepgram is called."""
+    measure = request.app.state.measure_audio
+    try:
+        # FFmpeg parsing blocks, so it runs in the threadpool.
+        seconds = await run_in_threadpool(measure, audio)
+    except UnreadableAudio as exc:
+        logger.info("Refused a transcription for %s: unreadable audio (%s)", user_id, exc)
+        raise ApiError(400, "unreadable_audio", "This recording couldn't be read. Record it again.") from None
+    # A little slack: the app stops at 10:00, and containers can run a few frames longer.
+    if seconds > MAX_RECORDING_SECONDS + 2:
+        logger.info("Refused a transcription for %s: %.0f s is over the limit", user_id, seconds)
+        raise ApiError(
+            400, "recording_too_long", f"This recording is {duration_text(seconds)} long; the limit is 10 minutes."
+        )
+    balance = await run_in_threadpool(billing.balance, user_id)
+    if charged_seconds(seconds) > balance.total_seconds:
+        raise ApiError(
+            402,
+            "payment_required",
+            f"This recording is {duration_text(seconds)}; you have {duration_text(balance.total_seconds)} left. "
+            "Buy more practice time to transcribe it.",
+        )
+    return seconds
+
+
+async def charge(billing: BillingStore, user_id: str, seconds: float) -> None:
+    """Deduct the measured length: free time first, then paid. Only takes with words are charged.
+    A failure is logged, not shown: the user already has the transcript."""
     try:
         await run_in_threadpool(billing.charge, user_id, seconds)
     except Exception:

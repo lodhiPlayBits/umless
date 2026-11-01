@@ -14,11 +14,11 @@ export const LAST_UPDATED = '1 November 2026'
  * The prices, in words. The server's price list (backend/app/billing/packs.py) is what's
  * charged; keep this in step with it.
  */
-/** Free transcriptions for every new account; the backend's FREE_TRANSCRIPTIONS (app/billing/packs.py). */
-export const FREE_TRANSCRIPTIONS = 3
+/** Free practice time for every new account, in minutes; the backend's FREE_SECONDS / 60 (app/billing/packs.py). */
+export const FREE_MINUTES = 90
 
 export const PRICING = {
-  free: `${FREE_TRANSCRIPTIONS} free transcriptions for every new account`,
+  free: `${FREE_MINUTES} minutes of free practice time for every new account`,
   packs: [
     { name: '1 session', time: '60 minutes of recording time', price: '₹49', minutes: 60, rupees: 49 },
     { name: '5 sessions', time: '300 minutes of recording time', price: '₹199', minutes: 300, rupees: 199 },

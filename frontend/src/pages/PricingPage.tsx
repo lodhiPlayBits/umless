@@ -1,4 +1,4 @@
-import { FREE_TRANSCRIPTIONS } from '@/content/business'
+import { FREE_MINUTES } from '@/content/business'
 import { PRICING_FAQ } from '@/content/marketing'
 import { CompareTable, CtaBand, Faq, PricingCards, Section } from '@/features/marketing'
 
@@ -8,7 +8,7 @@ export default function PricingPage() {
     <>
       <div className="mk-container mk-page-head">
         <h1 className="mk-display">Simple pricing. Start free.</h1>
-        <p className="mk-lead">{FREE_TRANSCRIPTIONS} free transcriptions on us. After that, buy practice time in packs: no subscription, and it never expires.</p>
+        <p className="mk-lead">{FREE_MINUTES} free minutes on us, counted by the second. After that, buy practice time in packs: no subscription, and it never expires.</p>
       </div>
       <div className="mk-container">
         <PricingCards />

@@ -27,7 +27,7 @@ tags:
   - name: transcriptions
     description: Speech-to-text through Deepgram; the audio is never stored
   - name: billing
-    description: Practice time (free transcriptions, then paid minutes) and Razorpay payments
+    description: Practice time (free minutes, then paid minutes) and Razorpay payments
   - name: takes
     description: The signed-in user's saved transcripts, per question (records in MySQL, transcripts in object storage)
 
@@ -218,10 +218,12 @@ paths:
         response's `take_id` names it. If saving fails the transcript is still returned, with
         `take_id: null`.
 
-        On a metered server (getAccount `metered`), the user needs a free transcription or paid
-        time left, checked before Deepgram is called (otherwise 402). A transcript with words
-        then uses one free transcription, or deducts its length (rounded up to a second) from
-        paid time, never below zero. A transcript with no words is free.
+        On a metered server (getAccount `metered`), the server first measures the recording's
+        length itself and refuses, before Deepgram is called, audio it can't read
+        (`unreadable_audio`), recordings over 10 minutes (`recording_too_long`) and recordings
+        longer than the user's free plus paid time left (402). A transcript with words then
+        deducts exactly the measured length, rounded up to a second: free minutes first, then
+        paid time. A transcript with no words is free.
 
         Each user runs one transcription at a time (another while one runs: 409) and at most a
         set number each clock hour, 30 by default (over it: 429). Both are checked before
@@ -268,8 +270,9 @@ paths:
                 $ref: '#/components/schemas/Transcript'
         '400':
           description: |
-            The body was empty (`empty_audio`, shown as `practice-empty`), or the Host header is
-            not localhost/127.0.0.1 (`invalid_host`).
+            The body was empty (`empty_audio`, shown as `practice-empty`); on a metered server the
+            audio couldn't be read (`unreadable_audio`) or is over 10 minutes long
+            (`recording_too_long`); or the Host header is not localhost/127.0.0.1 (`invalid_host`).
           content:
             application/json:
               schema:
@@ -289,14 +292,14 @@ paths:
         '404':
           $ref: '#/components/responses/QuestionNotFound'
         '402':
-          description: No free transcriptions or paid time left.
+          description: Not enough free or paid time left for this recording; `detail` says how long it is and how much is left.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
                 code: payment_required
-                detail: You're out of practice time. Buy a session to keep going.
+                detail: This recording is 6 min; you have 4 min left. Buy more practice time to transcribe it.
         '409':
           description: Another transcription of this user's is still running.
           content:
@@ -630,7 +633,7 @@ paths:
       description: |
         Self-serve refund under the published policy. Allowed when the purchase is `paid`, was
         paid within the last 3 days, and no paid practice time has been used since it was bought
-        (using even one session of a 5-session pack ends the refund; free transcriptions don't
+        (using even one session of a 5-session pack ends the refund; free minutes don't
         count); `refundable` in listPurchases says the same. The pack's time
         is removed at once and Razorpay is asked to refund the full amount; the purchase is
         then `refund_pending` until Razorpay's `refund.processed` webhook makes it `refunded`
@@ -1321,14 +1324,15 @@ components:
     Account:
       type: object
       additionalProperties: false
-      required: [metered, free_transcriptions_left, seconds_left, packs]
+      required: [metered, free_seconds_left, seconds_left, packs]
       properties:
         metered:
           type: boolean
           description: False on a server without payments (local use); then nothing is counted.
-        free_transcriptions_left:
+        free_seconds_left:
           type: integer
           minimum: 0
+          description: Free practice time left (every account starts with 5400, i.e. 90 minutes); used before paid time.
         seconds_left:
           type: integer
           minimum: 0
@@ -1340,7 +1344,7 @@ components:
             $ref: '#/components/schemas/Pack'
       example:
         metered: true
-        free_transcriptions_left: 0
+        free_seconds_left: 0
         seconds_left: 3540
         packs:
           - id: session_1
@@ -1527,6 +1531,8 @@ components:
         - payment_provider_failed
         - payments_unavailable
         - refund_not_allowed
+        - unreadable_audio
+        - recording_too_long
         - contact_unavailable
         - contact_failed
         - not_found

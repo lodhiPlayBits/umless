@@ -9,3 +9,5 @@ alembic==1.20.1
 PyJWT[crypto]==2.15.1
 oci==2.189.0
 redis==6.2.0
+# Measures each recording's length before Deepgram is called (app/transcription/duration.py).
+av==19.0.2

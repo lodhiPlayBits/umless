@@ -2,8 +2,11 @@
 
 from dataclasses import dataclass
 
-# Every new account can transcribe this many answers free, of any length.
-FREE_TRANSCRIPTIONS = 3
+# Every new account's free practice time: 90 minutes (three 30-minute sessions), used up by the
+# second, before any paid time.
+FREE_SECONDS = 90 * 60
+# The longest recording the server transcribes (the app stops recording at 10:00).
+MAX_RECORDING_SECONDS = 10 * 60
 # An unused pack can be refunded this long after it was paid for (the published refund policy).
 REFUND_DAYS = 3
 

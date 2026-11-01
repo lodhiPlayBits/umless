@@ -12,7 +12,7 @@ const order: PaymentOrder = {
   label: '1 session · 60 minutes',
 }
 const payment = { order_id: 'order_1', payment_id: 'pay_1', signature: 'sig' }
-const account: Account = { metered: true, free_transcriptions_left: 0, seconds_left: 3600, packs: [] }
+const account: Account = { metered: true, free_seconds_left: 0, seconds_left: 3600, packs: [] }
 
 function steps(overrides = {}) {
   return {

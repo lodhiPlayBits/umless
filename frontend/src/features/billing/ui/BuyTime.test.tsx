@@ -11,7 +11,7 @@ const packs: Account['packs'] = [
   { id: 'session_1', label: '1 session · 60 minutes', seconds: 3600, amount_paise: 4000, currency: 'INR' },
   { id: 'session_5', label: '5 sessions · 300 minutes', seconds: 18000, amount_paise: 12000, currency: 'INR' },
 ]
-const outOfTime: Account = { metered: true, free_transcriptions_left: 0, seconds_left: 0, packs }
+const outOfTime: Account = { metered: true, free_seconds_left: 0, seconds_left: 0, packs }
 
 function Balance() {
   const { account } = useAccount()

@@ -4,7 +4,7 @@
     docker compose exec backend python -m app.admin.move_user OLD_ID NEW_ID --apply
 
 Moves questions, takes (rows and transcripts in the bucket), paid orders and the balance.
-The new id may already have the account Clerk's first sign-in created (3 free, no time), but
+The new id may already have the account Clerk's first sign-in created (90 free minutes, no paid time), but
 nothing else: the user signs in once on production, then this runs, then they practise.
 Take a backup first (`docker compose run --rm backup once`).
 """
@@ -67,15 +67,15 @@ def move_user(engine: Engine, objects: TranscriptObjects, old: str, new: str, ap
     if old_account is None and not (report.questions or report.takes or report.orders):
         raise MoveRefused(f"{old} has no data")
 
-    # Free transcriptions: never more than either account had (no fresh 3 on top of the old
+    # Free time: never more than either account had (no fresh 90 minutes on top of the old
     # ones). Paid time: both added up.
     if old_account is not None:
-        free = old_account.free_transcriptions_left
+        free = old_account.free_seconds_left
         seconds = old_account.seconds_left
         if new_account is not None:
-            free = min(free, new_account.free_transcriptions_left)
+            free = min(free, new_account.free_seconds_left)
             seconds += new_account.seconds_left
-        report.balance = f"{free} free, {seconds} s paid"
+        report.balance = f"{free} s free, {seconds} s paid"
     else:
         report.balance = "unchanged (no account row for the old id)"
 
@@ -99,7 +99,7 @@ def move_user(engine: Engine, objects: TranscriptObjects, old: str, new: str, ap
                 conn.execute(
                     update(accounts)
                     .where(accounts.c.user_id == new)
-                    .values(free_transcriptions_left=free, seconds_left=seconds)
+                    .values(free_seconds_left=free, seconds_left=seconds)
                 )
                 conn.execute(delete(accounts).where(accounts.c.user_id == old))
     # Only after the rows point at the new copies.

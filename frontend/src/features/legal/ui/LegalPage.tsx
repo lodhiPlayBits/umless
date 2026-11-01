@@ -8,7 +8,7 @@ const email = <a href={`mailto:${BUSINESS.email}`}>{BUSINESS.email}</a>
 function Pricing() {
   return (
     <ul>
-      <li>{PRICING.free}, of any length up to the 10-minute recording limit.</li>
+      <li>{PRICING.free}, counted by the second.</li>
       {PRICING.packs.map((pack) => (
         <li key={pack.name}>
           {pack.name}: {pack.time} for {pack.price} (inclusive of all charges).
@@ -39,8 +39,9 @@ const PAGES: Record<LegalPageId, ReactNode> = {
       <h2>Prices and payment</h2>
       <Pricing />
       <p>
-        Each transcription uses one free transcription while you have any left, then deducts the length of the
-        recording from your practice time. Recordings in which no words are heard are not charged. Purchased time does
+        Each transcription deducts exactly the length of the recording, by the second: your free minutes first, then
+        your purchased practice time. A recording can be up to 10 minutes long. Recordings in which no words are heard
+        are not charged. Purchased time does
         not expire. Payments are processed by Razorpay; we never see or store your card, UPI or bank details. Prices
         are in Indian Rupees and may change; a change never affects time you have already bought.
       </p>
@@ -148,7 +149,7 @@ const PAGES: Record<LegalPageId, ReactNode> = {
           Once you use any of it, the pack can't be refunded. That includes the 5-session pack: if you use even one
           session (or part of one), none of it can be refunded.
         </li>
-        <li>Your free transcriptions don't count: using them doesn't affect a refund.</li>
+        <li>Your free minutes don't count: using them doesn't affect a refund.</li>
         <li>
           If you were charged but didn't get your practice time, or were charged twice, we refund the extra payment in
           full, whenever you tell us.

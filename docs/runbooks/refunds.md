@@ -2,7 +2,7 @@
 
 Published policy (`/legal/refunds`):
 - **Within 3 days of buying, and no paid practice time used since:** full refund.
-- **Any paid time used after buying** (even one session of a 5-session pack): no refund. Free transcriptions don't count.
+- **Any paid time used after buying** (even one session of a 5-session pack): no refund. Free minutes don't count.
 - **Charged but no time credited, or charged twice:** refund the extra payment in full, any time.
 
 ## The normal path: self-serve (nothing for you to do)
@@ -45,7 +45,7 @@ sg docker -c 'docker run --rm -it --env-file .env mysql:8.4 sh -c "MYSQL_PWD=\$D
 ```sql
 SELECT id, user_id, pack_id, amount_paise, seconds, status, payment_id, refund_id, paid_at, refunded_at
 FROM payment_orders WHERE payment_id = 'pay_XXXXXXXX';
-SELECT user_id, free_transcriptions_left, seconds_left FROM accounts WHERE user_id = 'user_XXXXXXXX';
+SELECT user_id, free_seconds_left, seconds_left FROM accounts WHERE user_id = 'user_XXXXXXXX';
 ```
 
 To check that the email matches the account, find the user id in the Clerk dashboard (**Production**) → Users.

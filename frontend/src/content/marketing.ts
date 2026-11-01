@@ -1,5 +1,5 @@
 import type { IconName } from '@/shared/ui'
-import { FREE_TRANSCRIPTIONS, PRICING } from './business'
+import { FREE_MINUTES, PRICING } from './business'
 
 // Copy for the public site (docs/design/v2/landing.html, pricing.html). Every claim here must be
 // true of the product today: check backend behaviour before changing one.
@@ -18,7 +18,7 @@ export const SAMPLE_TRANSCRIPT =
 export const HERO = {
   badge: 'Pause dots show where you hesitate',
   lead: 'Practise interview answers out loud. umless records you, then shows every um, uh and long pause, with your pace, so you hear what your interviewer hears.',
-  note: `${FREE_TRANSCRIPTIONS} free transcriptions, no card needed.`,
+  note: `${FREE_MINUTES} free minutes, no card needed.`,
   mockQuestion: 'Tell me about a time you led a project.',
   mockSummary: ['1:42 total', '138 wpm', 'um ×2 · uh ×1', '2 pauses · longest 3 s'],
 }
@@ -79,9 +79,9 @@ export const FAQ: FaqItem[] = [
 export const PRICING_FAQ: FaqItem[] = [
   {
     question: 'How is practice time counted?',
-    answer: `Each transcription uses one of your ${FREE_TRANSCRIPTIONS} free transcriptions while you have any left. After that, the length of the recording is taken from your practice time. Recording again without transcribing costs nothing.`,
+    answer: `By the second, for what you actually record: a 1-minute answer uses 1 minute. Your ${FREE_MINUTES} free minutes are used first, then any time you've bought. Recording again without transcribing costs nothing. One recording can be up to 10 minutes.`,
   },
-  { question: 'What if no words are heard?', answer: "Then it isn't charged: a recording with no words doesn't use a free transcription or any time." },
+  { question: 'What if no words are heard?', answer: "Then it isn't charged: a recording with no words doesn't use any of your time." },
   { question: 'Does practice time expire?', answer: 'No. Time you buy stays on your account until you use it.' },
   { question: 'How can I pay?', answer: 'UPI, cards, net banking and wallets, through Razorpay. We never see your card, UPI or bank details.' },
   { question: 'Can I get a refund?', answer: 'Yes, within 3 days of buying a pack, if you haven\'t used any of its practice time: one click in Settings → Billing. Once you use any of it (even one session of a 5-session pack), it can\'t be refunded. See the Refund & Cancellation Policy.' },
@@ -96,7 +96,7 @@ export function pricingRows(): CompareRow[] {
   const perMinute = (rupees: number, minutes: number) => `₹${(rupees / minutes).toFixed(2)} / min`
   return [
     { label: 'Price', free: '₹0', packs: PRICING.packs.map((p) => p.price) },
-    { label: 'Practice', free: `${FREE_TRANSCRIPTIONS} transcriptions`, packs: PRICING.packs.map((p) => `${p.minutes} minutes`) },
+    { label: 'Practice', free: `${FREE_MINUTES} minutes`, packs: PRICING.packs.map((p) => `${p.minutes} minutes`) },
     { label: 'Cost per minute', free: '—', packs: PRICING.packs.map((p) => perMinute(p.rupees, p.minutes)) },
     { label: 'Longest answer', free: '10 min', packs: PRICING.packs.map(() => '10 min') },
     { label: 'Fillers, pauses and pace', free: true, packs: PRICING.packs.map((): CompareCell => true) },

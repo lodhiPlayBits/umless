@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FREE_TRANSCRIPTIONS, LEGAL_PAGES } from '@/content/business'
+import { FREE_MINUTES, LEGAL_PAGES } from '@/content/business'
 import { Badge, Banner, Button, EmptyState, Link, Panel, Skeleton, Stat, cx } from '@/shared/ui'
 import type { Pack } from '../api/billingApi'
 import { formatPracticeTime, practiceTimeLabel, useAccount } from '../model/account'
@@ -66,7 +66,11 @@ export default function BillingPanel({ buyPack = realBuyPack }: { buyPack?: type
 
       <Panel title="Practice time" actions={<Badge tone="primary">{practiceTimeLabel(account)}</Badge>}>
         <div className="billing__balance">
-          <Stat label="Free transcriptions" value={account.free_transcriptions_left} unit={`of ${FREE_TRANSCRIPTIONS}`} />
+          <Stat
+            label="Free practice time"
+            value={account.free_seconds_left > 0 ? formatPracticeTime(account.free_seconds_left) : 'Used up'}
+            note={`of ${formatPracticeTime(FREE_MINUTES * 60)}`}
+          />
           <Stat
             label="Paid practice time"
             value={account.seconds_left > 0 ? formatPracticeTime(account.seconds_left) : 'None'}
@@ -74,8 +78,8 @@ export default function BillingPanel({ buyPack = realBuyPack }: { buyPack?: type
           />
         </div>
         <p className="muted">
-          Each transcription uses a free transcription while you have any, then the length of the recording. Recordings with no
-          words aren't charged.
+          Each transcription uses exactly the length of the recording, by the second: free minutes first, then paid time.
+          Recordings with no words aren't charged. One recording can be up to 10 minutes.
         </p>
       </Panel>
 

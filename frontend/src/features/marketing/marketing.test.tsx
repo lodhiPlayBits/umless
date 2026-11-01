@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { FREE_TRANSCRIPTIONS, PRICING } from '@/content/business'
+import { FREE_MINUTES, PRICING } from '@/content/business'
 import { FAQ, pricingRows } from '@/content/marketing'
 import { SessionContext } from '@/shared/lib/session'
 import type { Session } from '@/shared/lib/session'
@@ -21,7 +21,7 @@ describe('SampleTranscript', () => {
 describe('PricingCards', () => {
   it('shows the free allowance and every pack at the backend’s prices', () => {
     render(as('signedOut', <PricingCards />))
-    expect(screen.getByRole('article', { name: 'Free' })).toHaveTextContent(`${FREE_TRANSCRIPTIONS} free transcriptions`)
+    expect(screen.getByRole('article', { name: 'Free' })).toHaveTextContent(`${FREE_MINUTES} free minutes`)
     for (const pack of PRICING.packs) expect(screen.getByText(pack.price)).toBeInTheDocument()
   })
 

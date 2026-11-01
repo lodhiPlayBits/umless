@@ -37,18 +37,19 @@ export function resetAccount() {
   queryClient.removeQueries({ queryKey: ACCOUNT_KEY })
 }
 
-/** "59 min", "4 h 55 min"; whole minutes, rounded down. */
+/** "45 s", "59 min", "4 h 55 min"; whole minutes, rounded down, and seconds under a minute. */
 export function formatPracticeTime(seconds: number): string {
+  if (seconds > 0 && seconds < 60) return `${seconds} s`
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes} min`
   const rest = minutes % 60
   return rest ? `${Math.floor(minutes / 60)} h ${rest} min` : `${Math.floor(minutes / 60)} h`
 }
 
-/** Everything left to practise with, e.g. "3 free + 1 h left"; paid time shows even while free remains. */
+/** Everything left to practise with, e.g. "1 h 30 min free + 1 h left"; paid time shows even while free remains. */
 export function practiceTimeLabel(account: Account): string {
   const parts = [
-    account.free_transcriptions_left > 0 ? `${account.free_transcriptions_left} free` : null,
+    account.free_seconds_left > 0 ? `${formatPracticeTime(account.free_seconds_left)} free` : null,
     account.seconds_left > 0 ? formatPracticeTime(account.seconds_left) : null,
   ].filter(Boolean)
   return parts.length ? `${parts.join(' + ')} left` : 'Buy practice time'

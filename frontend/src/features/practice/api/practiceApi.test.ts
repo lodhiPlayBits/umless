@@ -22,6 +22,20 @@ describe('transcribeFailure', () => {
     })
   })
 
+  it("shows the server's numbers when a recording is longer than the time left", () => {
+    const error = new ApiError('This recording is 6 min; you have 4 min left. Buy more practice time to transcribe it.', 402, 'payment_required')
+    expect(transcribeFailure(error)).toMatchObject({
+      title: 'Not enough practice time for this recording',
+      detail: 'This recording is 6 min; you have 4 min left. Buy more practice time to transcribe it. Your recording is safe in this tab.',
+      needsTime: true,
+    })
+  })
+
+  it('maps recording_too_long and unreadable_audio, with no pointless retry', () => {
+    expect(transcribeFailure(err(400, 'recording_too_long'))).toMatchObject({ title: 'This recording is over 10 minutes', canRetry: false })
+    expect(transcribeFailure(err(400, 'unreadable_audio'))).toMatchObject({ title: "This recording couldn't be read", canRetry: false })
+  })
+
   it('maps 502 transcription_failed to "Transcription failed", retryable', () => {
     expect(transcribeFailure(err(502, 'transcription_failed'))).toMatchObject({ title: 'Transcription failed', canRetry: true })
   })

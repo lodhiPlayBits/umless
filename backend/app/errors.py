@@ -22,6 +22,8 @@ ErrorCode = Literal[
     "payment_provider_failed",
     "payments_unavailable",
     "refund_not_allowed",
+    "unreadable_audio",
+    "recording_too_long",
     "contact_unavailable",
     "contact_failed",
     "not_found",

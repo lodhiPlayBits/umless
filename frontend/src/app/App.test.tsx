@@ -74,7 +74,7 @@ describe('App layouts and nav', () => {
     render(<App />)
     await screen.findByRole('heading', { level: 1, name: 'Simple pricing. Start free.' })
     expect(document.title).toBe('Pricing · umless')
-    expect(document.querySelector('meta[name="description"]')).toHaveAttribute('content', expect.stringMatching(/free transcriptions/))
+    expect(document.querySelector('meta[name="description"]')).toHaveAttribute('content', expect.stringMatching(/free minutes/))
   })
 
   it('shows the not-found page for an unknown URL', async () => {

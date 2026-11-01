@@ -25,7 +25,7 @@ const packs: Account['packs'] = [
   { id: 'session_1', label: '1 session', seconds: 3600, amount_paise: 4000, currency: 'INR' },
   { id: 'session_5', label: '5 sessions', seconds: 18000, amount_paise: 12000, currency: 'INR' },
 ]
-const account = (free: number, seconds: number, metered = true): Account => ({ metered, free_transcriptions_left: free, seconds_left: seconds, packs })
+const account = (free: number, seconds: number, metered = true): Account => ({ metered, free_seconds_left: free, seconds_left: seconds, packs })
 
 beforeEach(() => {
   getAccount.mockReset()
@@ -35,9 +35,9 @@ beforeEach(() => {
 
 describe('BillingPanel', () => {
   it('shows what is left and every pack, the cheaper per minute marked best value', async () => {
-    getAccount.mockResolvedValue(account(2, 0))
+    getAccount.mockResolvedValue(account(1800, 0))
     render(<BillingPanel buyPack={vi.fn()} />)
-    expect(await screen.findByText('2 free left')).toBeInTheDocument()
+    expect(await screen.findByText('30 min free left')).toBeInTheDocument()
     expect(screen.getByText('None')).toBeInTheDocument()
     const best = screen.getByText('Best value').closest('li')!
     expect(within(best).getByRole('button', { name: 'Buy 5 sessions' })).toHaveClass('ui-button--primary')

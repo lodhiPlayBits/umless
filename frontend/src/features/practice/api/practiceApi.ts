@@ -79,12 +79,20 @@ export function transcribeFailure(error: unknown): TranscribeFailure {
     }
   }
   if (code === 'payment_required') {
+    // The server says how long the recording is and how much time is left.
+    const server = error instanceof ApiError && error.message.startsWith('This recording') ? `${error.message} ` : ''
     return {
-      title: "You're out of practice time",
-      detail: 'Buy more time, then press Try again. Your recording is safe in this tab.',
+      title: server ? 'Not enough practice time for this recording' : "You're out of practice time",
+      detail: `${server || 'Buy more time, then press Try again. '}Your recording is safe in this tab.`,
       canRetry: true,
       needsTime: true,
     }
+  }
+  if (code === 'recording_too_long') {
+    return { title: 'This recording is over 10 minutes', detail: 'Record a shorter answer. Your recording is still in this tab to download.', canRetry: false }
+  }
+  if (code === 'unreadable_audio') {
+    return { title: "This recording couldn't be read", detail: 'Record it again. If it keeps happening, try another browser.', canRetry: false }
   }
   if (code === 'transcription_in_progress') {
     return {

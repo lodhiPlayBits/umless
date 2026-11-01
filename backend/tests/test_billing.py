@@ -74,6 +74,8 @@ def metered_app(tmp_path, razorpay=None):
     )
     app = create_app(settings)
     app.state.razorpay = razorpay or FakeRazorpay()
+    # The test audio isn't real; it "measures" as long as the fake transcript (3.5 s).
+    app.state.measure_audio = lambda audio: 3.5
     return app
 
 
@@ -103,8 +105,11 @@ def pay(client, pack_id="session_1", headers=None):
 
 
 def use_up_free(client):
-    for _ in range(3):
-        assert transcribe(client).status_code == 200
+    """Spend the 90 free minutes (straight in the store: 1500 test takes would be slow)."""
+    from dataclasses import replace
+
+    store = client.app.state.billing
+    store._balances["local"] = replace(store.balance("local"), free_seconds_left=0)
 
 
 def validate(contract_schema, operation_id, response):
@@ -131,13 +136,13 @@ def captured(order_id, amount, payment_id="pay_webhook1"):
 # --- free transcriptions and paid time ---------------------------------------------------
 
 
-def test_a_new_account_has_three_free_transcriptions_and_the_packs(client, contract_schema):
+def test_a_new_account_has_90_free_minutes_and_the_packs(client, contract_schema):
     response = client.get("/api/account")
 
     assert response.status_code == 200
     validate(contract_schema, "getAccount", response)
     body = response.json()
-    assert (body["metered"], body["free_transcriptions_left"], body["seconds_left"]) == (True, 3, 0)
+    assert (body["metered"], body["free_seconds_left"], body["seconds_left"]) == (True, 5400, 0)
     assert [(p["id"], p["seconds"], p["amount_paise"]) for p in body["packs"]] == [
         ("session_1", 3600, 4900),
         ("session_5", 18000, 19900),
@@ -151,14 +156,14 @@ def test_without_razorpay_nothing_is_metered(tmp_path, contract_schema):
             assert transcribe(c).status_code == 200
 
     validate(contract_schema, "getAccount", response)
-    assert response.json() == {"metered": False, "free_transcriptions_left": 0, "seconds_left": 0, "packs": []}
+    assert response.json() == {"metered": False, "free_seconds_left": 0, "seconds_left": 0, "packs": []}
 
 
-def test_free_transcriptions_run_out_then_402_before_deepgram(tmp_path, contract_schema):
+def test_free_time_runs_out_then_402_before_deepgram(tmp_path, contract_schema):
     app = metered_app(tmp_path)
     with TestClient(app, base_url="http://localhost") as c:
         use_up_free(c)
-        assert account(c)["free_transcriptions_left"] == 0
+        assert account(c)["free_seconds_left"] == 0
         app.dependency_overrides[get_transcriber] = lambda: NeverCalledTranscriber()
         response = transcribe(c)
 
@@ -172,10 +177,10 @@ def test_a_take_without_words_is_free(tmp_path):
     app.dependency_overrides[get_transcriber] = lambda: SilentTranscriber()
     with TestClient(app, base_url="http://localhost") as c:
         assert transcribe(c).status_code == 200
-        assert account(c)["free_transcriptions_left"] == 3
+        assert account(c)["free_seconds_left"] == 5400
 
 
-def test_paid_time_is_used_after_the_free_transcriptions(client):
+def test_paid_time_is_used_after_the_free_time(client):
     use_up_free(client)
     pay(client)
 
@@ -185,8 +190,7 @@ def test_paid_time_is_used_after_the_free_transcriptions(client):
 
 def test_the_last_seconds_still_allow_one_more_take_then_stop_at_zero():
     store = InMemoryBillingStore()
-    for _ in range(3):
-        store.charge("u", 10)
+    store.charge("u", 5400)  # the free 90 minutes
     store.add_order(Order("o1", "u", "session_1", 4000, 2, "created"))
     store.mark_paid("o1", "p1")
 
@@ -481,9 +485,10 @@ def test_sql_billing_store(mysql_engine, tmp_path):
     store = SqlBillingStore(mysql_engine)
     user = f"{tmp_path}/user"
 
-    assert store.balance(user) == Balance(3, 0)
-    for left in (2, 1, 0):
-        assert store.charge(user, 50) == Balance(left, 0)
+    assert store.balance(user) == Balance(5400, 0)
+    assert store.charge(user, 50.2) == Balance(5349, 0)
+    assert store.charge(user, 5349) == Balance(0, 0)
+    assert store.balance(user).last_paid_use_at is None  # only free time used
     assert store.charge(user, 50) == Balance(0, 0)
 
     order = Order(f"order_{tmp_path.name}"[:64], user, "session_1", 4000, 3600, "created")

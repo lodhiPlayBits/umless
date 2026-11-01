@@ -58,7 +58,7 @@ def get_razorpay(request: Request) -> Razorpay | None:
 def account_body(balance: Balance | None) -> dict:
     return {
         "metered": balance is not None,
-        "free_transcriptions_left": balance.free_transcriptions_left if balance else 0,
+        "free_seconds_left": balance.free_seconds_left if balance else 0,
         "seconds_left": balance.seconds_left if balance else 0,
         "packs": [
             {

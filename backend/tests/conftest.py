@@ -107,6 +107,8 @@ def contract_schema(tmp_path_factory):
     from tests.test_contact import FakeMailer
 
     app.state.mailer = FakeMailer()
+    # Fuzzed bytes aren't audio: a fixed length, like the fake transcriber (measuring has its own tests).
+    app.state.measure_audio = lambda audio: 30.0
     # Plenty of paid time, so fuzzed transcriptions never run out (402 has its own tests).
     billing = InMemoryBillingStore()
     billing.add_order(Order("order_contract", "user_alice", "session_5", 12000, 10**9, "created"))

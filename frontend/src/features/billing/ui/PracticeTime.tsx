@@ -2,7 +2,7 @@ import { Button } from '@/shared/ui'
 import { practiceTimeLabel, useAccount } from '../model/account'
 import { useBuyTime } from './useBuyTime'
 
-/** Top-bar chip: free transcriptions or paid time left; opens Buy practice time. */
+/** Top-bar chip: free and paid time left; opens Buy practice time. */
 export default function PracticeTime({ className }: { className?: string }) {
   const { account } = useAccount()
   const buy = useBuyTime()

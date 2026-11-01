@@ -1,7 +1,7 @@
 import { lazy } from 'react'
 import type { ComponentType } from 'react'
 import type { LayoutId } from '@/app/access'
-import { FREE_TRANSCRIPTIONS, LEGAL_PAGES, PRICING } from '@/content/business'
+import { FREE_MINUTES, LEGAL_PAGES, PRICING } from '@/content/business'
 import { SITE_DESCRIPTION } from '@/content/marketing'
 import type { PageProps } from '@/pages/types'
 import { PATHS } from '@/shared/config/paths'
@@ -75,7 +75,7 @@ export const ROUTES: readonly RouteDef[] = [
     access: 'public',
     layout: 'marketing',
     title: 'Pricing',
-    description: `${FREE_TRANSCRIPTIONS} free transcriptions, then practice time from ${PRICING.packs[0].price}. No subscription; time never expires.`,
+    description: `${FREE_MINUTES} free minutes, then practice time from ${PRICING.packs[0].price}. No subscription; time never expires.`,
     page: PricingPage,
   },
   { id: 'signIn', pattern: PATHS.signIn, access: 'signedOut', layout: 'auth', title: 'Log in', page: SignInPage },

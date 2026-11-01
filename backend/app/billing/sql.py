@@ -23,6 +23,7 @@ from app.billing.store import (
     RefundRefused,
     charged_seconds,
     refund_refusal,
+    split_charge,
     utc_now,
 )
 from app.db import metadata
@@ -31,7 +32,10 @@ accounts = Table(
     "accounts",
     metadata,
     Column("user_id", String(255), primary_key=True),
+    # Replaced by free_seconds_left (migration 0007); still written (0) so the previous release
+    # can run after a rollback. Dropped in a later release.
     Column("free_transcriptions_left", Integer, nullable=False),
+    Column("free_seconds_left", Integer, nullable=False, server_default="0"),
     Column("seconds_left", Integer, nullable=False),
     Column("created_at", DateTime, nullable=False),  # UTC
     # When paid time was last used (UTC); packs bought before then can't be refunded.
@@ -72,7 +76,8 @@ class SqlBillingStore:
             .prefix_with("IGNORE")
             .values(
                 user_id=user_id,
-                free_transcriptions_left=NEW_ACCOUNT.free_transcriptions_left,
+                free_transcriptions_left=0,
+                free_seconds_left=NEW_ACCOUNT.free_seconds_left,
                 seconds_left=NEW_ACCOUNT.seconds_left,
                 created_at=utc_now(),
             )
@@ -81,14 +86,14 @@ class SqlBillingStore:
     @staticmethod
     def _read(conn, user_id: str) -> Balance:
         row = conn.execute(
-            select(accounts.c.free_transcriptions_left, accounts.c.seconds_left, accounts.c.last_paid_use_at).where(
+            select(accounts.c.free_seconds_left, accounts.c.seconds_left, accounts.c.last_paid_use_at).where(
                 accounts.c.user_id == user_id
             )
         ).first()
         if not row:
             return NEW_ACCOUNT
         used = row.last_paid_use_at.strftime(PAID_AT_FORMAT) if row.last_paid_use_at else None
-        return Balance(row.free_transcriptions_left, row.seconds_left, used)
+        return Balance(row.free_seconds_left, row.seconds_left, used)
 
     def balance(self, user_id: str) -> Balance:
         with self._engine.connect() as conn:
@@ -98,23 +103,19 @@ class SqlBillingStore:
         mine = accounts.c.user_id == user_id
         with self._engine.begin() as conn:
             self._ensure_account(conn, user_id)
-            # Atomic in the database: two requests at once can't both spend the last free one.
-            used_free = conn.execute(
+            # The row lock makes the read and the update one step: no double spending.
+            conn.execute(select(accounts.c.user_id).where(mine).with_for_update())
+            free, paid = split_charge(self._read(conn, user_id), charged_seconds(duration_seconds))
+            conn.execute(
                 update(accounts)
-                .where(mine, accounts.c.free_transcriptions_left > 0)
-                .values(free_transcriptions_left=accounts.c.free_transcriptions_left - 1)
-            ).rowcount
-            if not used_free:
-                seconds = charged_seconds(duration_seconds)
-                conn.execute(
-                    update(accounts)
-                    .where(mine)
-                    .values(
-                        seconds_left=func.greatest(accounts.c.seconds_left - seconds, 0),
-                        # Paid time was used: packs bought before now are no longer refundable.
-                        **({"last_paid_use_at": utc_now()} if seconds > 0 else {}),
-                    )
+                .where(mine)
+                .values(
+                    free_seconds_left=accounts.c.free_seconds_left - free,
+                    seconds_left=func.greatest(accounts.c.seconds_left - paid, 0),
+                    # Paid time was used: packs bought before now are no longer refundable.
+                    **({"last_paid_use_at": utc_now()} if paid > 0 else {}),
                 )
+            )
             return self._read(conn, user_id)
 
     def add_order(self, order: Order) -> None:

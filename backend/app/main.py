@@ -24,6 +24,7 @@ from app.takes.objects import InMemoryObjects, OciObjects
 from app.takes.repository import InMemoryTakeStore
 from app.takes.router import router as takes_router
 from app.takes.sql import SqlTakeStore
+from app.transcription.duration import audio_seconds
 from app.transcription.router import router as transcription_router
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # In memory until the lifespan connects Redis (only with REDIS_URL set).
     app.state.limits = InMemoryLimits(settings.transcriptions_per_hour)
     app.state.contact_limits = InMemoryLimits(CONTACT_MESSAGES_PER_HOUR)
+    # Measures each recording before Deepgram on metered servers; tests swap in a fixed length.
+    app.state.measure_audio = audio_seconds
     app.state.mailer = (
         ResendMailer(settings.resend_api_key, settings.contact_from) if settings.resend_api_key else None
     )
