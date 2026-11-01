@@ -174,3 +174,55 @@ def test_settings_read_the_contact_settings_without_showing_the_key(monkeypatch)
 
     assert (s.resend_api_key, s.contact_to, s.contact_from) == (API_KEY, "owner@example.com", "umless <onboarding@resend.dev>")
     assert API_KEY not in repr(s)
+
+
+# --- the contract and the backend agree on every input -----------------------------------
+
+import re
+from pathlib import Path
+
+import yaml
+from pydantic import ValidationError
+
+from app.contact.models import ContactMessage
+
+SCHEMA = yaml.safe_load((Path(__file__).resolve().parents[2] / "docs/api/openapi.yaml").read_text())["components"]["schemas"]["ContactMessage"]["properties"]
+# Regression: the fuzzer's email; U+0085 is "whitespace" to one regex engine and not to another,
+# so the contract called it valid while the backend rejected it (patterns used \s).
+FUZZED_EMAIL = "0ñ´ª\U000d1e41&\U000acee6J6@Ā¬\u0010\u0085\u0087M\u0015¹PO\u0091û\U000a7cdc\U000b6fd5ê·.\U00026772©³\U000b6ce6ë3\u0082h³"
+
+
+def backend_accepts(**change):
+    try:
+        ContactMessage(**{**GOOD, **change})
+        return True
+    except ValidationError:
+        return False
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("email", FUZZED_EMAIL),
+        ("email", "asha@example.com"),
+        ("email", "a.b+tag@mail.example.co.in"),
+        ("email", "asha@example"),
+        ("email", "as\u0085ha@example.com"),
+        ("email", "åsha@example.com"),
+        ("name", "\u0085"),
+        ("name", "Asha\u0085"),
+        ("name", " "),
+        ("name", "　"),
+        ("name", "Ásha Ñ"),
+        ("name", " "),
+        ("name", "A\tB"),
+    ],
+)
+def test_the_contract_and_the_backend_agree(field, value):
+    contract_accepts = re.fullmatch(SCHEMA[field]["pattern"], value) is not None and len(value) <= SCHEMA[field]["maxLength"]
+    assert backend_accepts(**{field: value}) == contract_accepts
+
+
+def test_the_fuzzed_email_is_now_invalid_in_both():
+    assert re.fullmatch(SCHEMA["email"]["pattern"], FUZZED_EMAIL) is None
+    assert not backend_accepts(email=FUZZED_EMAIL)

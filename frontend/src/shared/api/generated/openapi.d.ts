@@ -750,9 +750,9 @@ export interface components {
         ContactMessage: {
             /** @enum {string} */
             kind: "complaint" | "suggestion" | "other";
-            /** @description One line, not blank. */
+            /** @description One line, no control characters, not blank. */
             name: string;
-            /** @description Where the reply goes (Reply-To). */
+            /** @description Where the reply goes (Reply-To). ASCII, name@domain.tld. */
             email: string;
             message: string;
         };

@@ -3,8 +3,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 # Kept in step with ContactMessage in docs/api/openapi.yaml.
-ONE_LINE = r"^[^\x00-\x1f\x7f]*\S[^\x00-\x1f\x7f]*$"  # no newlines: the name goes in the subject
-EMAIL = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+# No \s/\S: Python, Rust (pydantic) and ECMAScript regex disagree on what counts as space.
+# One line, no control characters (C0 or C1), at least one visible character: the name goes in the subject.
+ONE_LINE = r"^[^\x00-\x1f\x7f-\x9f]*[^\x00-\x20\x7f-\x9f][^\x00-\x1f\x7f-\x9f]*$"
+EMAIL = r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$"
 
 
 class ContactMessage(BaseModel):
