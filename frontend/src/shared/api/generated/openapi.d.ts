@@ -117,6 +117,11 @@ export interface paths {
          *     Each user runs one transcription at a time (another while one runs: 409) and at most a
          *     set number each clock hour, 30 by default (over it: 429). Both are checked before
          *     Deepgram is called; a refused audio type doesn't count towards the hour.
+         *
+         *     Free time also has a site-wide daily cap: all users together may use a set number of
+         *     free minutes each India day, 600 by default. A recording that needs free time once the
+         *     cap is used up gets 503 `free_time_paused` before Deepgram is called. Users whose paid
+         *     time covers the whole recording are never refused and don't count towards the cap.
          */
         post: operations["createTranscription"];
         delete?: never;
@@ -312,6 +317,30 @@ export interface paths {
          *     user per hour (429). Signed-out visitors use the email address on the Contact page instead.
          */
         post: operations["sendContactMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/client-errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report an error that happened in the browser
+         * @description Sent by the frontend when a page crashes while rendering, when an error or rejected
+         *     promise goes uncaught, or when the Content-Security-Policy reports a violation. The server writes the report to its log at ERROR (which alerts) and
+         *     stores nothing. Sent only by signed-in users; signed-out pages keep errors in the console.
+         *     The path has no query string. At most 30 reports per user per hour (429); the frontend
+         *     also sends at most 5 per page load and skips repeats.
+         */
+        post: operations["reportClientError"];
         delete?: never;
         options?: never;
         head?: never;
@@ -760,6 +789,34 @@ export interface components {
             email: string;
             message: string;
         };
+        /**
+         * @example {
+         *       "kind": "render",
+         *       "message": "TypeError: Cannot read properties of undefined (reading 'text')",
+         *       "path": "/practice/3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10",
+         *       "stack": "TypeError: Cannot read properties of undefined (reading 'text')\n    at Transcript (index-abc123.js:1:2345)",
+         *       "component_stack": "\n    at Transcript\n    at PracticePage"
+         *     }
+         */
+        ClientErrorReport: {
+            /**
+             * @description `render`: a React render error (caught by an error boundary or not); `uncaught`: a
+             *     window `error` event; `rejection`: an unhandled promise rejection; `csp`: something
+             *     the Content-Security-Policy blocked, or would block while it is Report-Only (a
+             *     `securitypolicyviolation` event; the message names the directive and the blocked
+             *     origin or URL, without its query string).
+             * @enum {string}
+             */
+            kind: "render" | "uncaught" | "rejection" | "csp";
+            /** @description The error's name and message, cut to 1000 characters. */
+            message: string;
+            /** @description The page's pathname, without the query string or hash. */
+            path: string;
+            /** @description The JavaScript stack trace, if there is one. */
+            stack?: string;
+            /** @description React's component stack, for render errors. */
+            component_stack?: string;
+        };
         PurchaseList: {
             /** @description Newest first. */
             items: components["schemas"]["Purchase"][];
@@ -792,7 +849,7 @@ export interface components {
          * @example validation_error
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "refund_not_allowed" | "unreadable_audio" | "recording_too_long" | "contact_unavailable" | "contact_failed" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
+        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "refund_not_allowed" | "unreadable_audio" | "recording_too_long" | "contact_unavailable" | "contact_failed" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "free_time_paused" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
         /**
          * @example {
          *       "field": "text",
@@ -1263,18 +1320,16 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The server has no DEEPGRAM_API_KEY (and is not in fake mode). */
+            /**
+             * @description `transcription_unavailable`: the server has no DEEPGRAM_API_KEY (and is not in fake
+             *     mode). `free_time_paused`: the recording needs free time and the site-wide daily cap
+             *     on free time is used up; it resets at midnight India time.
+             */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    /**
-                     * @example {
-                     *       "code": "transcription_unavailable",
-                     *       "detail": "Transcription is unavailable because DEEPGRAM_API_KEY is not set."
-                     *     }
-                     */
                     "application/json": components["schemas"]["Error"];
                 };
             };
@@ -1674,6 +1729,48 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    reportClientError: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientErrorReport"];
+            };
+        };
+        responses: {
+            /** @description Logged. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationError"];
+            /** @description Too many reports from this user this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "rate_limited",
+                     *       "detail": "Too many error reports this hour."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
         };
     };
     razorpayWebhook: {

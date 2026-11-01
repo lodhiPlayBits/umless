@@ -51,6 +51,8 @@ class Settings:
     redis_url: str | None = field(default=None, repr=False)
     # Per user, each clock hour; protects the Deepgram bill (docs/adr/0006-redis-limits.md).
     transcriptions_per_hour: int = 30
+    # Site-wide, per India day: free-trial minutes all users together may use (app/free_cap.py).
+    free_minutes_per_day: int = 600
     # Set (from_env: UMLESS_LOG_LEVEL, default INFO): the lifespan starts queue logging (app/log.py).
     # None (tests building Settings directly): logging is left as it is, so pytest's capture works.
     log_level: str | None = None
@@ -60,6 +62,9 @@ class Settings:
     # Resend's test sender works until umless.in is verified in Resend, but only to the address the
     # Resend account was made with.
     contact_from: str = "umless <onboarding@resend.dev>"
+    # Set (from SENTRY_DSN): ERROR logs and unhandled errors go to Sentry (app/monitoring.py).
+    sentry_dsn: str | None = field(default=None, repr=False)
+    sentry_environment: str = "production"
 
     @classmethod
     def from_env(cls, env_files: tuple[Path, ...] = ENV_FILES) -> "Settings":
@@ -110,6 +115,10 @@ class Settings:
         per_hour = (values.get("UMLESS_TRANSCRIPTIONS_PER_HOUR") or "30").strip()
         if not per_hour.isdigit() or int(per_hour) < 1:
             raise ValueError(f"UMLESS_TRANSCRIPTIONS_PER_HOUR must be a whole number above 0, got {per_hour!r}")
+        free_per_day = (values.get("UMLESS_FREE_MINUTES_PER_DAY") or "600").strip()
+        # 0 is allowed: it pauses free time completely.
+        if not free_per_day.isdigit():
+            raise ValueError(f"UMLESS_FREE_MINUTES_PER_DAY must be a whole number, 0 or more, got {free_per_day!r}")
         log_level = (values.get("UMLESS_LOG_LEVEL") or "INFO").strip().upper()
         if log_level not in LOG_LEVELS:
             raise ValueError(f"UMLESS_LOG_LEVEL must be one of {list(LOG_LEVELS)}, got {log_level!r}")
@@ -128,10 +137,13 @@ class Settings:
             razorpay_webhook_secret=(values.get("RAZORPAY_WEBHOOK_SECRET") or "").strip() or None,
             redis_url=redis_url or None,
             transcriptions_per_hour=int(per_hour),
+            free_minutes_per_day=int(free_per_day),
             log_level=log_level,
             resend_api_key=(values.get("RESEND_API_KEY") or "").strip() or None,
             contact_to=(values.get("CONTACT_TO") or "").strip() or None,
             contact_from=(values.get("CONTACT_FROM") or "").strip() or "umless <onboarding@resend.dev>",
+            sentry_dsn=(values.get("SENTRY_DSN") or "").strip() or None,
+            sentry_environment=(values.get("SENTRY_ENVIRONMENT") or "").strip() or "production",
         )
 
 

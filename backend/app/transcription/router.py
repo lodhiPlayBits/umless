@@ -6,7 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from app.auth import get_user_id
 from app.billing.packs import FREE_SILENT_SECONDS, MAX_RECORDING_SECONDS
 from app.billing.router import get_billing
-from app.billing.store import BillingStore, charged_seconds
+from app.billing.store import Balance, BillingStore, charged_seconds
 from app.config import Settings
 from app.errors import ApiError
 from app.http import get_settings, media_type
@@ -132,26 +132,31 @@ async def transcribe_one(
 
     # Metered: the server measures the recording itself and checks it against the limit and the
     # time left, all before Deepgram is paid for it (docs/roadmap/2026-11-01-metered-free-time.md).
-    seconds = None
+    seconds, reserved = None, 0
     if billing is not None:
-        seconds = await measure_and_check(request, billing, user_id, audio)
+        seconds, reserved = await measure_and_check(request, billing, user_id, audio)
 
+    charged = False
     try:
-        transcript = await transcriber.transcribe(audio, content_type)
-        # OverflowError: Deepgram's timings make the summary rates infinite.
-        body = transcript_body(transcript)
-    except (TranscriptionError, OverflowError) as exc:
-        # The user only sees "try again"; the cause goes to the log. A refused account (revoked
-        # key, no credit) breaks every transcription, so it's an ERROR, which alerts.
-        # TranscriptionError messages never contain the API key.
-        level = logging.ERROR if isinstance(exc, DeepgramAccountError) else logging.WARNING
-        logger.log(level, "Transcription failed: %s", exc)
-        raise ApiError(
-            502, "transcription_failed", "Transcription failed. Try again in a moment."
-        ) from None
-
-    # Charged even with no words (Deepgram bills them too), except a short silent take: a mic problem.
-    charged = billing is not None and (bool(body["words"]) or seconds >= FREE_SILENT_SECONDS)
+        try:
+            transcript = await transcriber.transcribe(audio, content_type)
+            # OverflowError: Deepgram's timings make the summary rates infinite.
+            body = transcript_body(transcript)
+        except (TranscriptionError, OverflowError) as exc:
+            # The user only sees "try again"; the cause goes to the log. A refused account (revoked
+            # key, no credit) breaks every transcription, so it's an ERROR, which alerts.
+            # TranscriptionError messages never contain the API key.
+            level = logging.ERROR if isinstance(exc, DeepgramAccountError) else logging.WARNING
+            logger.log(level, "Transcription failed: %s", exc)
+            raise ApiError(
+                502, "transcription_failed", "Transcription failed. Try again in a moment."
+            ) from None
+        # Charged even with no words (Deepgram bills them too), except a short silent take: a mic problem.
+        charged = billing is not None and (bool(body["words"]) or seconds >= FREE_SILENT_SECONDS)
+    finally:
+        # Free time held for a take that wasn't charged goes back to today's pool.
+        if reserved and not charged:
+            await request.app.state.free_cap.release(reserved)
     if charged:
         await charge(billing, user_id, seconds)
     if question is not None:
@@ -177,9 +182,12 @@ def duration_text(seconds: float) -> str:
     return f"{minutes} min {rest} s" if rest else f"{minutes} min"
 
 
-async def measure_and_check(request: Request, billing: BillingStore, user_id: str, audio: bytes) -> float:
+async def measure_and_check(
+    request: Request, billing: BillingStore, user_id: str, audio: bytes
+) -> tuple[float, int]:
     """The recording's length, once it's known to be readable, at most 10 minutes, and no longer
-    than the user's free plus paid time. Every refusal happens before Deepgram is called."""
+    than the user's free plus paid time; and the free seconds reserved for it under the daily
+    cap (0 if none were needed). Every refusal happens before Deepgram is called."""
     measure = request.app.state.measure_audio
     try:
         # FFmpeg parsing blocks, so it runs in the threadpool.
@@ -201,7 +209,25 @@ async def measure_and_check(request: Request, billing: BillingStore, user_id: st
             f"This recording is {duration_text(seconds)}; you have {duration_text(balance.total_seconds)} left. "
             "Buy more practice time to transcribe it.",
         )
-    return seconds
+    return seconds, await reserve_free_time(request, balance, charged_seconds(seconds), user_id)
+
+
+async def reserve_free_time(request: Request, balance: Balance, seconds: int, user_id: str) -> int:
+    """Hold today's free seconds for this take under the site-wide cap (app/free_cap.py), and return
+    how many were held. Anyone whose paid time covers the whole take is never stopped or counted:
+    the cap is there for free-only accounts."""
+    free = min(balance.free_seconds_left, seconds)
+    if not free or balance.seconds_left >= seconds:
+        return 0
+    if not await request.app.state.free_cap.reserve(free):
+        logger.info("Refused a free transcription for %s: the daily free-time cap is reached", user_id)
+        raise ApiError(
+            503,
+            "free_time_paused",
+            "Free practice time is paused for today because a lot of people are using it. "
+            "It's back after midnight, or buy a session to keep going now.",
+        )
+    return free
 
 
 async def charge(billing: BillingStore, user_id: str, seconds: float) -> None:

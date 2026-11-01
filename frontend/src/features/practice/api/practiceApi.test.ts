@@ -58,6 +58,14 @@ describe('transcribeFailure', () => {
     })
   })
 
+  it('maps 503 free_time_paused to "paused for today", with a way to buy time', () => {
+    expect(transcribeFailure(err(503, 'free_time_paused'))).toMatchObject({
+      title: 'Free practice is paused for today',
+      canRetry: true,
+      needsTime: true,
+    })
+  })
+
   it('maps 429 rate_limited to "a lot of recordings this hour", retryable', () => {
     expect(transcribeFailure(err(429, 'rate_limited'))).toMatchObject({
       title: "You've made a lot of recordings this hour",

@@ -31,6 +31,9 @@ backend/            FastAPI (Python 3.12), pytest
   app/summary.py    filler flags, pauses, summary for the 200 body
   app/log.py        queue logging (QueueHandler + listener thread to stdout), started by the lifespan; UMLESS_LOG_LEVEL
   app/contact/      contact form: POST /api/contact → Resend email to CONTACT_TO, Reply-To the sender, 5/hour per user
+  app/client_errors/ browser crash reports: POST /api/client-errors → logged at ERROR, 30/hour per user (sent by src/shared/lib/reportError.ts when signed in)
+  app/monitoring.py Sentry, off unless SENTRY_DSN: ERROR logs and unhandled errors become events; never bodies, cookies, tokens, frame vars or IPs (docs/runbooks/monitoring.md)
+  app/free_cap.py   site-wide daily cap on free-trial time (600 min per India day, UMLESS_FREE_MINUTES_PER_DAY); 503 free_time_paused; paying users exempt
   app/limits.py     transcription limits: one at a time and 30/hour per user, Redis or in memory (ADR 0006)
 backup/             nightly mysqldump to an OCI bucket, restore-test.sh (docs/runbooks/backups.md)
 redis/              Redis service (compose + redis.conf), for the transcription limits; password in redis/.env

@@ -34,6 +34,7 @@ ErrorCode = Literal[
     "transcription_failed",
     "transcription_unavailable",
     "transcription_in_progress",
+    "free_time_paused",
     "rate_limited",
     "storage_unavailable",
     "invalid_host",
@@ -80,13 +81,20 @@ def _field_name(error: dict) -> str:
     return ".".join(loc) or "body"
 
 
+HTTP_METHODS = ("DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT")
+
+
 def _allowed_methods(request: Request) -> list[str]:
-    methods: set[str] = set()
-    for route in request.app.router.routes:
-        match, _ = route.matches(request.scope)
-        if match != Match.NONE:
-            methods |= getattr(route, "methods", None) or set()
-    return sorted(methods)
+    # Asks the router whether each method would fully match, rather than reading `methods` off
+    # its routes: in newer FastAPI (0.162 here) an included router is one wrapper route without them.
+    return [
+        method
+        for method in HTTP_METHODS
+        if any(
+            route.matches({**request.scope, "method": method})[0] == Match.FULL
+            for route in request.app.router.routes
+        )
+    ]
 
 
 async def _api_error(request: Request, exc: ApiError) -> JSONResponse:

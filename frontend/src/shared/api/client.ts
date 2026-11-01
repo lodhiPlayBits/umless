@@ -24,6 +24,15 @@ export function sendTokensFrom(source: TokenSource | null) {
   tokenSource = source
 }
 
+/** Whether requests would carry a session token now (false signed out, local use and tests). */
+export async function hasSessionToken(): Promise<boolean> {
+  try {
+    return Boolean(await tokenSource?.())
+  } catch {
+    return false
+  }
+}
+
 client.use({
   async onRequest({ request }) {
     const token = await tokenSource?.()

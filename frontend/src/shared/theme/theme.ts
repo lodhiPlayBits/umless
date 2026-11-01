@@ -5,7 +5,7 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 /** What is on screen. */
 export type ThemeMode = 'light' | 'dark'
 
-/** Also read by the inline script in index.html, which applies the theme before first paint. */
+/** Also read by public/theme-init.js (loaded first by index.html), which applies the theme before first paint. */
 export const THEME_STORAGE_KEY = 'umless-theme'
 
 const listeners = new Set<() => void>()

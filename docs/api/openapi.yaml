@@ -30,6 +30,8 @@ tags:
     description: Practice time (free minutes, then paid minutes) and Razorpay payments
   - name: takes
     description: The signed-in user's saved transcripts, per question (records in MySQL, transcripts in object storage)
+  - name: client-errors
+    description: Crash reports from the browser, so failures on the live site reach the server log
 
 paths:
   /api/health:
@@ -229,6 +231,11 @@ paths:
         Each user runs one transcription at a time (another while one runs: 409) and at most a
         set number each clock hour, 30 by default (over it: 429). Both are checked before
         Deepgram is called; a refused audio type doesn't count towards the hour.
+
+        Free time also has a site-wide daily cap: all users together may use a set number of
+        free minutes each India day, 600 by default. A recording that needs free time once the
+        cap is used up gets 503 `free_time_paused` before Deepgram is called. Users whose paid
+        time covers the whole recording are never refused and don't count towards the cap.
       x-screen:
         - practice-review / transcribe recording
         - practice-transcribe-error / retry transcription
@@ -340,14 +347,23 @@ paths:
                 code: transcription_failed
                 detail: Transcription failed. Try again in a moment.
         '503':
-          description: The server has no DEEPGRAM_API_KEY (and is not in fake mode).
+          description: |
+            `transcription_unavailable`: the server has no DEEPGRAM_API_KEY (and is not in fake
+            mode). `free_time_paused`: the recording needs free time and the site-wide daily cap
+            on free time is used up; it resets at midnight India time.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-              example:
-                code: transcription_unavailable
-                detail: Transcription is unavailable because DEEPGRAM_API_KEY is not set.
+              examples:
+                transcriptionUnavailable:
+                  value:
+                    code: transcription_unavailable
+                    detail: Transcription is unavailable because DEEPGRAM_API_KEY is not set.
+                freeTimePaused:
+                  value:
+                    code: free_time_paused
+                    detail: Free practice time is paused for today because a lot of people are using it. It's back after midnight, or buy a session to keep going now.
 
   /api/questions/{questionId}/takes:
     parameters:
@@ -743,6 +759,48 @@ paths:
               example:
                 code: contact_unavailable
                 detail: The contact form isn't set up on this server. Email us instead.
+
+  /api/client-errors:
+    post:
+      operationId: reportClientError
+      tags: [client-errors]
+      summary: Report an error that happened in the browser
+      description: |
+        Sent by the frontend when a page crashes while rendering, when an error or rejected
+        promise goes uncaught, or when the Content-Security-Policy reports a violation. The server writes the report to its log at ERROR (which alerts) and
+        stores nothing. Sent only by signed-in users; signed-out pages keep errors in the console.
+        The path has no query string. At most 30 reports per user per hour (429); the frontend
+        also sends at most 5 per page load and skips repeats.
+      x-screen:
+        - every screen / crash or uncaught error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientErrorReport'
+      responses:
+        '204':
+          description: Logged.
+        '400':
+          $ref: '#/components/responses/InvalidHost'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: Too many reports from this user this hour.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: rate_limited
+                detail: Too many error reports this hour.
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/payments/webhook:
     post:
@@ -1454,6 +1512,45 @@ components:
         email: asha@example.com
         message: Could the summary also show how my pace changed over the week?
 
+    ClientErrorReport:
+      type: object
+      additionalProperties: false
+      required: [kind, message, path]
+      properties:
+        kind:
+          type: string
+          enum: [render, uncaught, rejection, csp]
+          description: |
+            `render`: a React render error (caught by an error boundary or not); `uncaught`: a
+            window `error` event; `rejection`: an unhandled promise rejection; `csp`: something
+            the Content-Security-Policy blocked, or would block while it is Report-Only (a
+            `securitypolicyviolation` event; the message names the directive and the blocked
+            origin or URL, without its query string).
+        message:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: The error's name and message, cut to 1000 characters.
+        path:
+          type: string
+          maxLength: 500
+          pattern: '^/'
+          description: The page's pathname, without the query string or hash.
+        stack:
+          type: string
+          maxLength: 10000
+          description: The JavaScript stack trace, if there is one.
+        component_stack:
+          type: string
+          maxLength: 10000
+          description: React's component stack, for render errors.
+      example:
+        kind: render
+        message: "TypeError: Cannot read properties of undefined (reading 'text')"
+        path: /practice/3f2c8a9e-6b1d-4c0e-9a57-2d8e1f4b7c10
+        stack: "TypeError: Cannot read properties of undefined (reading 'text')\n    at Transcript (index-abc123.js:1:2345)"
+        component_stack: "\n    at Transcript\n    at PracticePage"
+
     PurchaseList:
       type: object
       additionalProperties: false
@@ -1544,6 +1641,7 @@ components:
         - transcription_failed
         - transcription_unavailable
         - transcription_in_progress
+        - free_time_paused
         - rate_limited
         - storage_unavailable
         - invalid_host

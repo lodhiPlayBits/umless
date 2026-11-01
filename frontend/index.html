@@ -19,10 +19,8 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="umless — say less um" />
     <meta name="twitter:card" content="summary_large_image" />
-    <script>
-      // Apply the saved theme before first paint (src/shared/theme/theme.ts owns it after that).
-      try { var t = localStorage.getItem('umless-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t) } catch (e) {}
-    </script>
+    <!-- Applies the saved theme before first paint. Blocking on purpose, and a file, not inline, for the CSP. -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

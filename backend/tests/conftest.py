@@ -107,6 +107,10 @@ def contract_schema(tmp_path_factory):
     from tests.test_contact import FakeMailer
 
     app.state.mailer = FakeMailer()
+    # A high cap, so fuzzed crash reports never hit 429 (tests/test_client_errors.py covers it).
+    from app.limits import InMemoryLimits
+
+    app.state.client_error_limits = InMemoryLimits(10**9)
     # Fuzzed bytes aren't audio: a fixed length, like the fake transcriber (measuring has its own tests).
     app.state.measure_audio = lambda audio: 30.0
     # Plenty of paid time, so fuzzed transcriptions never run out (402 has its own tests).

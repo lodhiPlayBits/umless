@@ -88,6 +88,15 @@ export function transcribeFailure(error: unknown): TranscribeFailure {
       needsTime: true,
     }
   }
+  if (code === 'free_time_paused') {
+    // The site-wide daily cap on free time is used up; paid time still works.
+    return {
+      title: 'Free practice is paused for today',
+      detail: "A lot of people are practising today. Free time is back after midnight, or buy a session to keep going now. Your recording is safe in this tab.",
+      canRetry: true,
+      needsTime: true,
+    }
+  }
   if (code === 'recording_too_long') {
     return { title: 'This recording is over 10 minutes', detail: 'Record a shorter answer. Your recording is still in this tab to download.', canRetry: false }
   }
