@@ -62,9 +62,10 @@ USED_SINCE_BOUGHT = "Paid practice time has been used since this pack was bought
 
 
 def split_charge(balance: Balance, seconds: int) -> tuple[int, int]:
-    """How many of `seconds` come from free time and how many from paid time (free first)."""
+    """How many of `seconds` come from free time and how many from paid time (free first). Never
+    more than the account has: paid time used is what decides refunds, so it must be real."""
     free = min(balance.free_seconds_left, seconds)
-    return free, seconds - free
+    return free, min(seconds - free, balance.seconds_left)
 
 
 def refund_refusal(order: Order, balance: Balance, now: datetime) -> str | None:

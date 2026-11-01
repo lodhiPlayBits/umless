@@ -81,7 +81,7 @@ export const PRICING_FAQ: FaqItem[] = [
     question: 'How is practice time counted?',
     answer: `By the second, for what you actually record: a 1-minute answer uses 1 minute. Your ${FREE_MINUTES} free minutes are used first, then any time you've bought. Recording again without transcribing costs nothing. One recording can be up to 10 minutes.`,
   },
-  { question: 'What if no words are heard?', answer: "Then it isn't charged: a recording with no words doesn't use any of your time." },
+  { question: 'What if no words are heard?', answer: "If the recording is under 15 seconds, it isn't charged (that's usually a muted mic). Longer recordings use their time even without words, because the speech service still processes them." },
   { question: 'Does practice time expire?', answer: 'No. Time you buy stays on your account until you use it.' },
   { question: 'How can I pay?', answer: 'UPI, cards, net banking and wallets, through Razorpay. We never see your card, UPI or bank details.' },
   { question: 'Can I get a refund?', answer: 'Yes, within 3 days of buying a pack, if you haven\'t used any of its practice time: one click in Settings → Billing. Once you use any of it (even one session of a 5-session pack), it can\'t be refunded. See the Refund & Cancellation Policy.' },

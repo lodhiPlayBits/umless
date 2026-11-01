@@ -46,7 +46,7 @@ export function formatPracticeTime(seconds: number): string {
   return rest ? `${Math.floor(minutes / 60)} h ${rest} min` : `${Math.floor(minutes / 60)} h`
 }
 
-/** Everything left to practise with, e.g. "1 h 30 min free + 1 h left"; paid time shows even while free remains. */
+/** Everything left to practise with, e.g. "20 min free + 1 h left"; paid time shows even while free remains. */
 export function practiceTimeLabel(account: Account): string {
   const parts = [
     account.free_seconds_left > 0 ? `${formatPracticeTime(account.free_seconds_left)} free` : null,

@@ -8,7 +8,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.billing.packs import PACKS
+from app.billing.packs import FREE_SECONDS, PACKS
 from app.billing.razorpay import Razorpay, RazorpayError
 from app.billing.sql import SqlBillingStore
 from app.billing.store import Balance, InMemoryBillingStore, Order, charged_seconds
@@ -105,7 +105,7 @@ def pay(client, pack_id="session_1", headers=None):
 
 
 def use_up_free(client):
-    """Spend the 90 free minutes (straight in the store: 1500 test takes would be slow)."""
+    """Spend the free minutes (straight in the store: hundreds of test takes would be slow)."""
     from dataclasses import replace
 
     store = client.app.state.billing
@@ -136,13 +136,13 @@ def captured(order_id, amount, payment_id="pay_webhook1"):
 # --- free transcriptions and paid time ---------------------------------------------------
 
 
-def test_a_new_account_has_90_free_minutes_and_the_packs(client, contract_schema):
+def test_a_new_account_has_the_free_minutes_and_the_packs(client, contract_schema):
     response = client.get("/api/account")
 
     assert response.status_code == 200
     validate(contract_schema, "getAccount", response)
     body = response.json()
-    assert (body["metered"], body["free_seconds_left"], body["seconds_left"]) == (True, 5400, 0)
+    assert (body["metered"], body["free_seconds_left"], body["seconds_left"]) == (True, FREE_SECONDS, 0)
     assert [(p["id"], p["seconds"], p["amount_paise"]) for p in body["packs"]] == [
         ("session_1", 3600, 4900),
         ("session_5", 18000, 19900),
@@ -177,7 +177,7 @@ def test_a_take_without_words_is_free(tmp_path):
     app.dependency_overrides[get_transcriber] = lambda: SilentTranscriber()
     with TestClient(app, base_url="http://localhost") as c:
         assert transcribe(c).status_code == 200
-        assert account(c)["free_seconds_left"] == 5400
+        assert account(c)["free_seconds_left"] == FREE_SECONDS
 
 
 def test_paid_time_is_used_after_the_free_time(client):
@@ -190,7 +190,7 @@ def test_paid_time_is_used_after_the_free_time(client):
 
 def test_the_last_seconds_still_allow_one_more_take_then_stop_at_zero():
     store = InMemoryBillingStore()
-    store.charge("u", 5400)  # the free 90 minutes
+    store.charge("u", FREE_SECONDS)  # the free minutes
     store.add_order(Order("o1", "u", "session_1", 4000, 2, "created"))
     store.mark_paid("o1", "p1")
 
@@ -485,9 +485,9 @@ def test_sql_billing_store(mysql_engine, tmp_path):
     store = SqlBillingStore(mysql_engine)
     user = f"{tmp_path}/user"
 
-    assert store.balance(user) == Balance(5400, 0)
-    assert store.charge(user, 50.2) == Balance(5349, 0)
-    assert store.charge(user, 5349) == Balance(0, 0)
+    assert store.balance(user) == Balance(FREE_SECONDS, 0)
+    assert store.charge(user, 50.2) == Balance(FREE_SECONDS - 51, 0)
+    assert store.charge(user, FREE_SECONDS - 51) == Balance(0, 0)
     assert store.balance(user).last_paid_use_at is None  # only free time used
     assert store.charge(user, 50) == Balance(0, 0)
 

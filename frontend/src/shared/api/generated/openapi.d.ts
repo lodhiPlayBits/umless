@@ -109,9 +109,10 @@ export interface paths {
          *     On a metered server (getAccount `metered`), the server first measures the recording's
          *     length itself and refuses, before Deepgram is called, audio it can't read
          *     (`unreadable_audio`), recordings over 10 minutes (`recording_too_long`) and recordings
-         *     longer than the user's free plus paid time left (402). A transcript with words then
-         *     deducts exactly the measured length, rounded up to a second: free minutes first, then
-         *     paid time. A transcript with no words is free.
+         *     longer than the user's free plus paid time left (402). The transcription then deducts
+         *     exactly the measured length, rounded up to a second: free minutes first, then paid time.
+         *     Recordings with no words are charged too (Deepgram bills them), except those under 15
+         *     seconds, which is what a muted microphone looks like.
          *
          *     Each user runs one transcription at a time (another while one runs: 409) and at most a
          *     set number each clock hour, 30 by default (over it: 429). Both are checked before
@@ -693,7 +694,7 @@ export interface components {
         Account: {
             /** @description False on a server without payments (local use); then nothing is counted. */
             metered: boolean;
-            /** @description Free practice time left (every account starts with 5400, i.e. 90 minutes); used before paid time. */
+            /** @description Free practice time left (every account starts with 1200, i.e. 20 minutes); used before paid time. */
             free_seconds_left: number;
             /** @description Paid practice time left. */
             seconds_left: number;

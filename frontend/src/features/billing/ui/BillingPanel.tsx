@@ -79,7 +79,7 @@ export default function BillingPanel({ buyPack = realBuyPack }: { buyPack?: type
         </div>
         <p className="muted">
           Each transcription uses exactly the length of the recording, by the second: free minutes first, then paid time.
-          Recordings with no words aren't charged. One recording can be up to 10 minutes.
+          A recording under 15 seconds with no words isn't charged. One recording can be up to 10 minutes.
         </p>
       </Panel>
 

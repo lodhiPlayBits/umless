@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.concurrency import run_in_threadpool
 
 from app.auth import get_user_id
-from app.billing.packs import MAX_RECORDING_SECONDS
+from app.billing.packs import FREE_SILENT_SECONDS, MAX_RECORDING_SECONDS
 from app.billing.router import get_billing
 from app.billing.store import BillingStore, charged_seconds
 from app.config import Settings
@@ -150,7 +150,9 @@ async def transcribe_one(
             502, "transcription_failed", "Transcription failed. Try again in a moment."
         ) from None
 
-    if billing is not None and body["words"]:
+    # Charged even with no words (Deepgram bills them too), except a short silent take: a mic problem.
+    charged = billing is not None and (bool(body["words"]) or seconds >= FREE_SILENT_SECONDS)
+    if charged:
         await charge(billing, user_id, seconds)
     if question is not None:
         body["take_id"] = await save_take(get_take_history(request, user_id), question, body)
@@ -160,7 +162,7 @@ async def transcribe_one(
         body["duration_seconds"],
         user_id,
         len(body["words"]),
-        "charged" if billing is not None and body["words"] else "not charged",
+        "charged" if charged else "not charged",
         body.get("take_id") or "not saved",
     )
     return body
@@ -203,8 +205,8 @@ async def measure_and_check(request: Request, billing: BillingStore, user_id: st
 
 
 async def charge(billing: BillingStore, user_id: str, seconds: float) -> None:
-    """Deduct the measured length: free time first, then paid. Only takes with words are charged.
-    A failure is logged, not shown: the user already has the transcript."""
+    """Deduct the measured length: free time first, then paid. A failure is logged, not shown:
+    the user already has the transcript."""
     try:
         await run_in_threadpool(billing.charge, user_id, seconds)
     except Exception:

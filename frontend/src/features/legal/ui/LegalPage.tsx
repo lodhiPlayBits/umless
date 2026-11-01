@@ -40,8 +40,8 @@ const PAGES: Record<LegalPageId, ReactNode> = {
       <Pricing />
       <p>
         Each transcription deducts exactly the length of the recording, by the second: your free minutes first, then
-        your purchased practice time. A recording can be up to 10 minutes long. Recordings in which no words are heard
-        are not charged. Purchased time does
+        your purchased practice time. A recording can be up to 10 minutes long. A recording shorter than 15 seconds in
+        which no words are heard is not charged. Purchased time does
         not expire. Payments are processed by Razorpay; we never see or store your card, UPI or bank details. Prices
         are in Indian Rupees and may change; a change never affects time you have already bought.
       </p>

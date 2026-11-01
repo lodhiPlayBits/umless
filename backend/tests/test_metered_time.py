@@ -7,6 +7,7 @@ import av
 import pytest
 from fastapi.testclient import TestClient
 
+from app.billing.packs import FREE_SECONDS
 from app.billing.store import Balance, InMemoryBillingStore
 from app.transcription.duration import UnreadableAudio, audio_seconds
 from app.transcription.router import get_transcriber
@@ -47,17 +48,17 @@ def set_balance(client, free, paid=0):
     store._balances[USER] = replace(store.balance(USER), free_seconds_left=free, seconds_left=paid)
 
 
-def test_a_new_account_has_90_free_minutes(tmp_path):
+def test_a_new_account_has_20_free_minutes(tmp_path):
     client, _ = client_for(tmp_path, 10)
     with client:
-        assert (account(client)["free_seconds_left"], account(client)["seconds_left"]) == (5400, 0)
+        assert (account(client)["free_seconds_left"], account(client)["seconds_left"]) == (FREE_SECONDS, 0)
 
 
 def test_a_take_uses_exactly_its_measured_length_rounded_up(tmp_path):
     client, transcriber = client_for(tmp_path, 61.2)  # Deepgram says 999 s; the measurement counts
     with client:
         assert transcribe(client).status_code == 200
-        assert (account(client)["free_seconds_left"], account(client)["seconds_left"]) == (5400 - 62, 0)
+        assert (account(client)["free_seconds_left"], account(client)["seconds_left"]) == (FREE_SECONDS - 62, 0)
     assert transcriber.calls == 1
 
 
@@ -107,7 +108,7 @@ def test_over_10_minutes_is_refused_before_deepgram(tmp_path, seconds):
         response = transcribe(client)
         assert response.status_code == 400
         assert response.json()["code"] == "recording_too_long"
-        assert account(client)["free_seconds_left"] == 5400
+        assert account(client)["free_seconds_left"] == FREE_SECONDS
 
 
 def test_exactly_10_minutes_is_allowed(tmp_path):
@@ -126,11 +127,22 @@ def test_unreadable_audio_is_400_before_deepgram(tmp_path):
         assert response.json() == {"code": "unreadable_audio", "detail": "This recording couldn't be read. Record it again."}
 
 
-def test_a_take_with_no_words_is_free(tmp_path):
+def test_a_long_take_with_no_words_is_charged(tmp_path):
+    # Regression: silent takes were free for the user, but Deepgram bills them anyway, so
+    # 10 minutes of silence 30 times an hour cost umless 300 minutes and the user nothing.
     client, _ = client_for(tmp_path, 45, SilentTranscriber())
     with client:
         assert transcribe(client).status_code == 200
-        assert account(client)["free_seconds_left"] == 5400
+        assert account(client)["free_seconds_left"] == FREE_SECONDS - 45
+
+
+@pytest.mark.parametrize("seconds, charged", [(14.9, 0), (15, 15)])
+def test_a_short_take_with_no_words_is_free(tmp_path, seconds, charged):
+    # A muted or failed mic: under 15 s with no words isn't charged.
+    client, _ = client_for(tmp_path, seconds, SilentTranscriber())
+    with client:
+        assert transcribe(client).status_code == 200
+        assert account(client)["free_seconds_left"] == FREE_SECONDS - charged
 
 
 def test_charging_takes_free_first_then_paid_in_the_store():
@@ -142,6 +154,16 @@ def test_charging_takes_free_first_then_paid_in_the_store():
     assert store.charge(USER, 100) == Balance(0, 459)
     assert store.balance(USER).last_paid_use_at is not None
     assert store.charge(USER, 10_000) == Balance(0, 0)  # never below zero
+
+
+def test_no_paid_use_is_recorded_when_there_was_no_paid_time():
+    # Free time running out on an account with no paid time isn't a "paid use" (it would block
+    # a refund of a pack bought later in the same second).
+    store = InMemoryBillingStore()
+    store._balances[USER] = Balance(30, 0)
+
+    assert store.charge(USER, 100) == Balance(0, 0)
+    assert store.balance(USER).last_paid_use_at is None
 
 
 # --- measuring real audio ----------------------------------------------------------------
@@ -195,7 +217,8 @@ def test_anything_else_is_unreadable(data):
         audio_seconds(data)
 
 
-def test_migration_0007_turns_each_free_transcription_into_30_minutes(mysql_engine):
+def test_migrations_0007_and_0008_convert_then_cap_free_time(mysql_engine):
+    # 0007: each free transcription left became 30 minutes; 0008: free time is capped at 20 minutes.
     from alembic import command
     from sqlalchemy import text
 
@@ -207,12 +230,16 @@ def test_migration_0007_turns_each_free_transcription_into_30_minutes(mysql_engi
         with mysql_engine.begin() as conn:
             conn.execute(text(
                 "INSERT INTO accounts (user_id, free_transcriptions_left, seconds_left, created_at) "
-                "VALUES ('mig_three', 3, 100, NOW()), ('mig_one', 1, 0, NOW()), ('mig_none', 0, 3600, NOW())"
+                "VALUES ('mig_three', 3, 100, NOW()), ('mig_none', 0, 3600, NOW())"
             ))
+        command.upgrade(config, "0007")
+        with mysql_engine.begin() as conn:
+            assert dict(conn.execute(text("SELECT user_id, free_seconds_left FROM accounts WHERE user_id LIKE 'mig_%'")).all()) == {"mig_three": 5400, "mig_none": 0}
+            conn.execute(text("INSERT INTO accounts (user_id, free_transcriptions_left, free_seconds_left, seconds_left, created_at) VALUES ('mig_some', 0, 600, 0, NOW())"))
         command.upgrade(config, "head")
         with mysql_engine.connect() as conn:
             rows = dict(conn.execute(text("SELECT user_id, free_seconds_left FROM accounts WHERE user_id LIKE 'mig_%'")).all())
-        assert rows == {"mig_three": 5400, "mig_one": 1800, "mig_none": 0}
+        assert rows == {"mig_three": 1200, "mig_none": 0, "mig_some": 600}
     finally:
         command.upgrade(config, "head")
         with mysql_engine.begin() as conn:

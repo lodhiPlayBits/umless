@@ -78,7 +78,7 @@ The backend reaches the OCI bucket as its VM (instance principal), so there are 
 
 ## Deploy: payments (Razorpay)
 
-Each account gets 90 free minutes (charged by the second, free first), then buys practice time (`docs/adr/0004-razorpay-billing.md`).
+Each account gets 20 free minutes (charged by the second, free first), then buys practice time (`docs/adr/0004-razorpay-billing.md`).
 
 1. Put `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `backend/.env` (test keys `rzp_test_…` until going live).
 2. In the Razorpay dashboard → Webhooks → Add: URL `https://umless.in/api/payments/webhook`, events `payment.captured` and `order.paid`, and a secret; put that secret in `RAZORPAY_WEBHOOK_SECRET`.

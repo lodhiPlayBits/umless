@@ -15,7 +15,7 @@ export const LAST_UPDATED = '1 November 2026'
  * charged; keep this in step with it.
  */
 /** Free practice time for every new account, in minutes; the backend's FREE_SECONDS / 60 (app/billing/packs.py). */
-export const FREE_MINUTES = 90
+export const FREE_MINUTES = 20
 
 export const PRICING = {
   free: `${FREE_MINUTES} minutes of free practice time for every new account`,

@@ -11,7 +11,7 @@ Date: 2026-11-01 · Status: approved 2026-11-01 ("do whatever you feel good"); b
    - recordings longer than the time left.
 
    Today "1 second of paid time left + a 25 MB upload" (1–2 hours) costs the user 1 second and costs you the whole Deepgram call, and each free account gets 3 transcriptions of any length.
-3. Unchanged: only transcripts are saved (OCI bucket), never audio; a transcript with no words is free.
+3. Unchanged: only transcripts are saved (OCI bucket), never audio. Changed after review: takes with no words are charged too (Deepgram bills them), except under 15 s (a muted mic).
 
 Done when:
 - a 1-minute take deducts 60 s from the free minutes, or from paid time once the free minutes are gone;
@@ -86,4 +86,13 @@ PR → `ci-passed` → merge → automatic deploy (migration 0007 runs on start)
   - Tests:
     - backend 659 with MySQL and Redis, including every audio format, Chrome-style WebM without a duration header, the 3 refusals before Deepgram, exact free→paid charging and the migration conversion;
     - frontend 482, lint and build clean.
-
+- 2026-11-01: **Review fix: silent takes are charged.**
+  - "No words = free" let an account send 10-minute silent takes 30 times an hour: 300 Deepgram minutes an hour, free to the user.
+  - Now every take is charged its measured length, except under 15 s with no words (`FREE_SILENT_SECONDS`), which looks like a muted mic.
+  - The regression test failed before the fix. The FAQ, terms, the Billing tab and the contract wording are updated.
+- 2026-11-01: **Free trial lowered to 20 minutes** (owner, after review).
+  - 90 minutes cost ≈ ₹33 in Deepgram per account ($0.0043/min pre-recorded; the review's ₹60 used the streaming rate), and it beat the ₹49 / 60-minute pack, so a throwaway email was worth ≈ ₹33.
+  - 20 minutes ≈ ₹7: 6–8 full answers.
+  - Migration 0008 trims unused free time above 20 minutes (the 90-minute version was live under an hour).
+  - Also fixed: a charge that ran past the free time on an account with no paid time no longer counts as a paid use; it could have blocked a later refund.
+  - Tests use `FREE_SECONDS`, not hard-coded numbers. Results: backend 662 with MySQL, frontend 482.

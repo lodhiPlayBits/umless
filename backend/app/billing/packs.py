@@ -2,11 +2,15 @@
 
 from dataclasses import dataclass
 
-# Every new account's free practice time: 90 minutes (three 30-minute sessions), used up by the
-# second, before any paid time.
-FREE_SECONDS = 90 * 60
+# Every new account's free practice time, used up by the second before any paid time. 20 minutes
+# (6-8 full answers): enough to feel the product without replacing a purchase. 90 cost ≈ ₹33 in
+# Deepgram per throwaway account and beat the ₹49 pack (decided 2026-11-01).
+FREE_SECONDS = 20 * 60
 # The longest recording the server transcribes (the app stops recording at 10:00).
 MAX_RECORDING_SECONDS = 10 * 60
+# Deepgram bills every recording, words or not, so takes are charged even when silent. The one
+# exception: shorter than this with no words, which is what a muted or failed mic looks like.
+FREE_SILENT_SECONDS = 15
 # An unused pack can be refunded this long after it was paid for (the published refund policy).
 REFUND_DAYS = 3
 
