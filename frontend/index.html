@@ -6,6 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>umless · Say less um</title>
     <meta name="description" content="Practise interview answers out loud. umless shows every um, uh and long pause in your transcript, with your pace." />
+    <link rel="canonical" href="https://umless.in/" />
+    <!-- Link previews. Social scrapers (WhatsApp, LinkedIn, Slack, X) don't run JS, so these stay
+         static and describe the product; src/app/useDocumentMeta.ts updates canonical per route. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="umless" />
+    <meta property="og:url" content="https://umless.in/" />
+    <meta property="og:title" content="umless · Say less um" />
+    <meta property="og:description" content="Practise interview answers out loud. umless shows every um, uh and long pause in your transcript, with your pace." />
+    <meta property="og:image" content="https://umless.in/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="umless — say less um" />
+    <meta name="twitter:card" content="summary_large_image" />
     <script>
       // Apply the saved theme before first paint (src/shared/theme/theme.ts owns it after that).
       try { var t = localStorage.getItem('umless-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t) } catch (e) {}

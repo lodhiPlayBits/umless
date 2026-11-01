@@ -1,0 +1,16 @@
+# https://umless.in/robots.txt
+User-agent: *
+Allow: /
+
+# Signed-in app and auth screens: nothing for a crawler, and they only ever render a shell.
+Disallow: /dashboard
+Disallow: /questions
+Disallow: /practice/
+Disallow: /history
+Disallow: /takes/
+Disallow: /purchases
+Disallow: /settings
+Disallow: /sign-in
+Disallow: /sign-up
+
+Sitemap: https://umless.in/sitemap.xml

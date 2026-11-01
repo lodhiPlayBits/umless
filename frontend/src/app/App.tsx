@@ -46,7 +46,7 @@ function App() {
     if (redirect) navigate(redirect, { replace: true, force: true })
   }, [redirect])
 
-  useDocumentMeta(resolved.route)
+  useDocumentMeta(resolved.route, pathname)
 
   // The next person to sign in on this browser must not see the last one's questions, takes or time.
   useEffect(() => {
