@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import './Dialog.css'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -17,7 +18,9 @@ type DialogProps = {
 
 /**
  * A modal: focus moves to the first control inside and Tab stays inside; Esc or a click on the
- * backdrop dismisses it; on close, focus goes back where it was.
+ * backdrop dismisses it; on close, focus goes back where it was. Rendered into <body>: opened from
+ * inside a container with its own stacking context (the sticky sidebar), its z-index would only
+ * rank it within that container and the page would show through.
  */
 export default function Dialog({ title, children, actions, onDismiss, role = 'dialog' }: DialogProps) {
   const titleId = useId()
@@ -53,7 +56,7 @@ export default function Dialog({ title, children, actions, onDismiss, role = 'di
     }
   }
 
-  return (
+  return createPortal(
     <div className="ui-overlay" onMouseDown={(event) => event.target === event.currentTarget && onDismiss?.()}>
       <div
         ref={ref}
@@ -75,6 +78,7 @@ export default function Dialog({ title, children, actions, onDismiss, role = 'di
         )}
         {actions && <div className="ui-dialog__actions">{actions}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

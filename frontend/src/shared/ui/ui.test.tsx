@@ -288,6 +288,20 @@ describe('List', () => {
 })
 
 describe('Dialog', () => {
+  it('renders at the top of the page, above every container', () => {
+    // Regression: opened from the sidebar (position: sticky, its own stacking context), the
+    // dialog's z-index only ranked it inside the sidebar, and page buttons showed through it.
+    render(
+      <aside data-testid="sidebar" style={{ position: 'sticky' }}>
+        <Dialog title="Buy practice time">Body</Dialog>
+      </aside>,
+    )
+    const overlay = screen.getByRole('dialog', { name: 'Buy practice time' }).parentElement!
+    expect(overlay).toHaveClass('ui-overlay')
+    expect(overlay.parentElement).toBe(document.body)
+    expect(screen.getByTestId('sidebar')).not.toContainElement(overlay)
+  })
+
   function Harness({ onDismiss }: { onDismiss?: () => void }) {
     return (
       <>
