@@ -34,6 +34,8 @@ accounts = Table(
     Column("free_transcriptions_left", Integer, nullable=False),
     Column("seconds_left", Integer, nullable=False),
     Column("created_at", DateTime, nullable=False),  # UTC
+    # When paid time was last used (UTC); packs bought before then can't be refunded.
+    Column("last_paid_use_at", DateTime, nullable=True),
     mysql_charset="utf8mb4",
     mysql_collate="utf8mb4_bin",
 )
@@ -79,11 +81,14 @@ class SqlBillingStore:
     @staticmethod
     def _read(conn, user_id: str) -> Balance:
         row = conn.execute(
-            select(accounts.c.free_transcriptions_left, accounts.c.seconds_left).where(
+            select(accounts.c.free_transcriptions_left, accounts.c.seconds_left, accounts.c.last_paid_use_at).where(
                 accounts.c.user_id == user_id
             )
         ).first()
-        return Balance(row.free_transcriptions_left, row.seconds_left) if row else NEW_ACCOUNT
+        if not row:
+            return NEW_ACCOUNT
+        used = row.last_paid_use_at.strftime(PAID_AT_FORMAT) if row.last_paid_use_at else None
+        return Balance(row.free_transcriptions_left, row.seconds_left, used)
 
     def balance(self, user_id: str) -> Balance:
         with self._engine.connect() as conn:
@@ -100,13 +105,14 @@ class SqlBillingStore:
                 .values(free_transcriptions_left=accounts.c.free_transcriptions_left - 1)
             ).rowcount
             if not used_free:
+                seconds = charged_seconds(duration_seconds)
                 conn.execute(
                     update(accounts)
                     .where(mine)
                     .values(
-                        seconds_left=func.greatest(
-                            accounts.c.seconds_left - charged_seconds(duration_seconds), 0
-                        )
+                        seconds_left=func.greatest(accounts.c.seconds_left - seconds, 0),
+                        # Paid time was used: packs bought before now are no longer refundable.
+                        **({"last_paid_use_at": utc_now()} if seconds > 0 else {}),
                     )
                 )
             return self._read(conn, user_id)

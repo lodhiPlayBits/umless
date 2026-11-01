@@ -54,6 +54,12 @@ class Settings:
     # Set (from_env: UMLESS_LOG_LEVEL, default INFO): the lifespan starts queue logging (app/log.py).
     # None (tests building Settings directly): logging is left as it is, so pytest's capture works.
     log_level: str | None = None
+    # Set (from RESEND_API_KEY and CONTACT_TO): the contact form emails CONTACT_TO. Unset: 503.
+    resend_api_key: str | None = field(default=None, repr=False)
+    contact_to: str | None = None
+    # Resend's test sender works until umless.in is verified in Resend, but only to the address the
+    # Resend account was made with.
+    contact_from: str = "umless <onboarding@resend.dev>"
 
     @classmethod
     def from_env(cls, env_files: tuple[Path, ...] = ENV_FILES) -> "Settings":
@@ -123,6 +129,9 @@ class Settings:
             redis_url=redis_url or None,
             transcriptions_per_hour=int(per_hour),
             log_level=log_level,
+            resend_api_key=(values.get("RESEND_API_KEY") or "").strip() or None,
+            contact_to=(values.get("CONTACT_TO") or "").strip() or None,
+            contact_from=(values.get("CONTACT_FROM") or "").strip() or "umless <onboarding@resend.dev>",
         )
 
 

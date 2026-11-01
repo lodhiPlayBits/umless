@@ -139,8 +139,8 @@ def test_a_new_account_has_three_free_transcriptions_and_the_packs(client, contr
     body = response.json()
     assert (body["metered"], body["free_transcriptions_left"], body["seconds_left"]) == (True, 3, 0)
     assert [(p["id"], p["seconds"], p["amount_paise"]) for p in body["packs"]] == [
-        ("session_1", 3600, 4000),
-        ("session_5", 18000, 12000),
+        ("session_1", 3600, 4900),
+        ("session_5", 18000, 19900),
     ]
 
 
@@ -208,9 +208,9 @@ def test_creating_an_order_uses_the_server_price(client, contract_schema):
     assert response.status_code == 201
     validate(contract_schema, "createPaymentOrder", response)
     body = response.json()
-    assert (body["amount_paise"], body["currency"], body["key_id"]) == (12000, "INR", "rzp_test_key")
+    assert (body["amount_paise"], body["currency"], body["key_id"]) == (19900, "INR", "rzp_test_key")
     [sent] = client.app.state.razorpay.orders
-    assert sent["amount"] == 12000
+    assert sent["amount"] == 19900
     assert sent["notes"]["pack_id"] == "session_5"
 
 
@@ -335,14 +335,14 @@ def test_a_paid_order_is_listed_as_a_purchase_with_its_receipt_id(client, contra
     assert purchase["order_id"] == order["order_id"]
     assert purchase["payment_id"] == f"pay_{order['order_id']}"
     assert purchase["label"] == "1 session · 60 minutes"
-    assert (purchase["seconds"], purchase["amount_paise"], purchase["currency"]) == (3600, 4000, "INR")
+    assert (purchase["seconds"], purchase["amount_paise"], purchase["currency"]) == (3600, 4900, "INR")
     assert purchase["paid_at"].endswith("Z")
 
 
 def test_purchases_are_newest_first_and_include_webhook_credits(client):
     first, _ = pay(client, "session_1")
     second = client.post("/api/payments/orders", json={"pack_id": "session_5"}).json()
-    webhook(client, captured(second["order_id"], 12000, payment_id="pay_hook"))
+    webhook(client, captured(second["order_id"], 19900, payment_id="pay_hook"))
 
     items = client.get("/api/payments").json()["items"]
     assert [p["order_id"] for p in items] == [second["order_id"], first["order_id"]]
@@ -373,7 +373,7 @@ def test_without_razorpay_there_are_no_purchases(tmp_path, contract_schema):
 def test_the_webhook_credits_an_order_the_browser_never_verified(client, contract_schema):
     order = client.post("/api/payments/orders", json={"pack_id": "session_1"}).json()
 
-    response = webhook(client, captured(order["order_id"], 4000))
+    response = webhook(client, captured(order["order_id"], 4900))
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -383,8 +383,8 @@ def test_the_webhook_credits_an_order_the_browser_never_verified(client, contrac
 
 def test_webhook_and_verify_together_credit_once(client):
     order, _ = pay(client)
-    webhook(client, captured(order["order_id"], 4000))
-    webhook(client, {**captured(order["order_id"], 4000), "event": "order.paid"})
+    webhook(client, captured(order["order_id"], 4900))
+    webhook(client, {**captured(order["order_id"], 4900), "event": "order.paid"})
 
     assert account(client)["seconds_left"] == 3600
 
@@ -394,12 +394,12 @@ def test_the_webhook_needs_razorpays_signature_not_a_sign_in(tmp_path, contract_
         alice = {"Authorization": f"Bearer {make_token('user_alice')}"}
         order = c.post("/api/payments/orders", json={"pack_id": "session_1"}, headers=alice).json()
 
-        forged = webhook(c, captured(order["order_id"], 4000), secret="guessed")
+        forged = webhook(c, captured(order["order_id"], 4900), secret="guessed")
         assert forged.status_code == 400
         validate(contract_schema, "razorpayWebhook", forged)
         assert account(c, alice)["seconds_left"] == 0
 
-        assert webhook(c, captured(order["order_id"], 4000)).status_code == 200
+        assert webhook(c, captured(order["order_id"], 4900)).status_code == 200
         assert account(c, alice)["seconds_left"] == 3600
 
 
@@ -548,8 +548,8 @@ def test_a_database_without_razorpay_is_refused(monkeypatch):
 
 def test_the_packs_are_the_agreed_prices():
     assert {p.id: (p.seconds // 60, p.amount_paise // 100) for p in PACKS.values()} == {
-        "session_1": (60, 40),
-        "session_5": (300, 120),
+        "session_1": (60, 49),
+        "session_5": (300, 199),
     }
 
 

@@ -96,8 +96,8 @@ export default function BillingPanel({ buyPack = realBuyPack }: { buyPack?: type
           ))}
         </ul>
         <p className="muted billing__note">
-          Pay with UPI, cards, net banking or wallets through Razorpay. One-off payments, no subscription. An unused pack can be
-          refunded within 7 days: see the <Link to={`/${refunds.id}`}>{refunds.title}</Link>.
+          Pay with UPI, cards, net banking or wallets through Razorpay. One-off payments, no subscription. A pack can be refunded
+          within 3 days if none of its time has been used: see the <Link to={`/${refunds.id}`}>{refunds.title}</Link>.
         </p>
       </Panel>
 

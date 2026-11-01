@@ -15,6 +15,8 @@ from app.errors import LocalHostOnlyMiddleware, add_error_handlers
 from app.questions.repository import JsonFileQuestionRepository
 from app.questions.router import router as questions_router
 from app.db import create_mysql_engine
+from app.contact.mailer import ResendMailer
+from app.contact.router import router as contact_router
 from app.limits import InMemoryLimits, RedisLimits
 from app.log import start_logging
 from app.questions.sql import SqlQuestionStore
@@ -25,6 +27,9 @@ from app.takes.sql import SqlTakeStore
 from app.transcription.router import router as transcription_router
 
 logger = logging.getLogger(__name__)
+
+# Contact form messages per user per hour.
+CONTACT_MESSAGES_PER_HOUR = 5
 
 
 @asynccontextmanager
@@ -37,6 +42,7 @@ async def lifespan(app: FastAPI):
         # from_url doesn't connect; the first command does, and RedisLimits fails open.
         redis_client = redis.asyncio.from_url(settings.redis_url, socket_timeout=2, socket_connect_timeout=2)
         app.state.limits = RedisLimits(redis_client, settings.transcriptions_per_hour)
+        app.state.contact_limits = RedisLimits(redis_client, CONTACT_MESSAGES_PER_HOUR, prefix="umless:contact")
         logger.info("Transcription limits in Redis, %d per user per hour", settings.transcriptions_per_hour)
     else:
         logger.info("Transcription limits in memory, %d per user per hour", settings.transcriptions_per_hour)
@@ -95,6 +101,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.billing = None
     # In memory until the lifespan connects Redis (only with REDIS_URL set).
     app.state.limits = InMemoryLimits(settings.transcriptions_per_hour)
+    app.state.contact_limits = InMemoryLimits(CONTACT_MESSAGES_PER_HOUR)
+    app.state.mailer = (
+        ResendMailer(settings.resend_api_key, settings.contact_from) if settings.resend_api_key else None
+    )
     add_error_handlers(app)
     app.add_middleware(LocalHostOnlyMiddleware)
     app.include_router(questions_router)
@@ -102,6 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(billing_router)
     app.include_router(billing_webhook_router)
     app.include_router(transcription_router)
+    app.include_router(contact_router)
 
     @app.get("/api/health")
     def health() -> dict:

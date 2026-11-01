@@ -46,8 +46,8 @@ describe('CompareTable', () => {
     render(<CompareTable />)
     expect(screen.getAllByRole('columnheader')).toHaveLength(2 + PRICING.packs.length)
     const row = screen.getByRole('row', { name: /Cost per minute/ })
-    expect(within(row).getByText('₹0.67 / min')).toBeInTheDocument()
-    expect(within(row).getByText('₹0.40 / min')).toBeInTheDocument()
+    expect(within(row).getByText('₹0.82 / min')).toBeInTheDocument()
+    expect(within(row).getByText('₹0.66 / min')).toBeInTheDocument()
   })
 
   it('every row has a cell for free and each pack', () => {

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 # Every new account can transcribe this many answers free, of any length.
 FREE_TRANSCRIPTIONS = 3
 # An unused pack can be refunded this long after it was paid for (the published refund policy).
-REFUND_DAYS = 7
+REFUND_DAYS = 3
 
 
 @dataclass(frozen=True)
@@ -21,7 +21,7 @@ class Pack:
 PACKS = {
     pack.id: pack
     for pack in (
-        Pack("session_1", "1 session · 60 minutes", 60 * 60, 40_00),
-        Pack("session_5", "5 sessions · 300 minutes", 5 * 60 * 60, 120_00),
+        Pack("session_1", "1 session · 60 minutes", 60 * 60, 49_00),
+        Pack("session_5", "5 sessions · 300 minutes", 5 * 60 * 60, 199_00),
     )
 }

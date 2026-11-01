@@ -277,15 +277,38 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Refund an unused pack bought in the last 7 days
+         * Refund an unused pack bought in the last 3 days
          * @description Self-serve refund under the published policy. Allowed when the purchase is `paid`, was
-         *     paid within the last 7 days, and the account's paid time still covers the pack's
-         *     time (it hasn't been used); `refundable` in listPurchases says the same. The pack's time
+         *     paid within the last 3 days, and no paid practice time has been used since it was bought
+         *     (using even one session of a 5-session pack ends the refund; free transcriptions don't
+         *     count); `refundable` in listPurchases says the same. The pack's time
          *     is removed at once and Razorpay is asked to refund the full amount; the purchase is
          *     then `refund_pending` until Razorpay's `refund.processed` webhook makes it `refunded`
          *     (or `refund.failed` puts the time back and makes it `paid` again). No request body.
          */
         post: operations["requestRefund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a complaint, suggestion or other message to umless
+         * @description Emails the message to the umless inbox (through Resend), with the given email address as
+         *     Reply-To so the reply goes straight to the sender. Plain text only. At most 5 messages per
+         *     user per hour (429). Signed-out visitors use the email address on the Contact page instead.
+         */
+        post: operations["sendContactMessage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -652,14 +675,14 @@ export interface components {
          *           "id": "session_1",
          *           "label": "1 session · 60 minutes",
          *           "seconds": 3600,
-         *           "amount_paise": 4000,
+         *           "amount_paise": 4900,
          *           "currency": "INR"
          *         },
          *         {
          *           "id": "session_5",
          *           "label": "5 sessions · 300 minutes",
          *           "seconds": 18000,
-         *           "amount_paise": 12000,
+         *           "amount_paise": 19900,
          *           "currency": "INR"
          *         }
          *       ]
@@ -685,7 +708,7 @@ export interface components {
          *       "pack_id": "session_1",
          *       "label": "1 session · 60 minutes",
          *       "seconds": 3600,
-         *       "amount_paise": 4000,
+         *       "amount_paise": 4900,
          *       "currency": "INR",
          *       "paid_at": "2026-10-30T08:50:46Z",
          *       "status": "paid",
@@ -713,8 +736,25 @@ export interface components {
              * @enum {string}
              */
             status: "paid" | "refund_pending" | "refunded";
-            /** @description Whether requestRefund would accept it now: `paid`, paid within the last 7 days, and the account's paid time still covers its time. */
+            /** @description Whether requestRefund would accept it now: `paid`, paid within the last 3 days, and no paid time used since it was bought. */
             refundable: boolean;
+        };
+        /**
+         * @example {
+         *       "kind": "suggestion",
+         *       "name": "Asha",
+         *       "email": "asha@example.com",
+         *       "message": "Could the summary also show how my pace changed over the week?"
+         *     }
+         */
+        ContactMessage: {
+            /** @enum {string} */
+            kind: "complaint" | "suggestion" | "other";
+            /** @description One line, not blank. */
+            name: string;
+            /** @description Where the reply goes (Reply-To). */
+            email: string;
+            message: string;
         };
         PurchaseList: {
             /** @description Newest first. */
@@ -748,7 +788,7 @@ export interface components {
          * @example validation_error
          * @enum {string}
          */
-        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "refund_not_allowed" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
+        ErrorCode: "validation_error" | "unsupported_media_type" | "question_not_found" | "take_not_found" | "order_not_found" | "payment_required" | "payment_invalid" | "payment_provider_failed" | "payments_unavailable" | "refund_not_allowed" | "contact_unavailable" | "contact_failed" | "not_found" | "method_not_allowed" | "empty_audio" | "audio_too_large" | "unsupported_audio_type" | "transcription_failed" | "transcription_unavailable" | "transcription_in_progress" | "rate_limited" | "storage_unavailable" | "invalid_host" | "unauthorized" | "internal_error";
         /**
          * @example {
          *       "field": "text",
@@ -1523,8 +1563,8 @@ export interface operations {
                 };
             };
             /**
-             * @description The policy doesn't allow it: already refunded or in progress, paid more than 7 days
-             *     ago, or some of the time has been used. `detail` says which.
+             * @description The policy doesn't allow it: already refunded or in progress, paid more than 3 days
+             *     ago, or paid time has been used since it was bought. `detail` says which.
              */
             409: {
                 headers: {
@@ -1534,7 +1574,7 @@ export interface operations {
                     /**
                      * @example {
                      *       "code": "refund_not_allowed",
-                     *       "detail": "This pack was bought more than 7 days ago, so it can't be refunded."
+                     *       "detail": "This pack was bought more than 3 days ago, so it can't be refunded."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -1557,6 +1597,78 @@ export interface operations {
                 };
             };
             503: components["responses"]["PaymentsUnavailable"];
+        };
+    };
+    sendContactMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactMessage"];
+            };
+        };
+        responses: {
+            /** @description Sent. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InvalidHost"];
+            401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["ValidationError"];
+            /** @description Too many messages from this user this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "rate_limited",
+                     *       "detail": "You've sent a lot of messages this hour. Try again later, or email us."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description The email provider couldn't be reached or refused the message. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "contact_failed",
+                     *       "detail": "Your message couldn't be sent. Try again in a moment, or email us."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This server has no email provider set up. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "code": "contact_unavailable",
+                     *       "detail": "The contact form isn't set up on this server. Email us instead."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     razorpayWebhook: {

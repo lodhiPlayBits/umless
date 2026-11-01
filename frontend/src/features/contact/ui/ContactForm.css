@@ -1,0 +1,3 @@
+.contact-form { margin-block-start: var(--space-6); }
+.contact-form form { display: grid; gap: var(--space-4); max-width: 40rem; }
+.contact-form form > .ui-button { justify-self: start; }
