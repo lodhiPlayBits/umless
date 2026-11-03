@@ -1,4 +1,11 @@
 import os
+
+# Tests never report to Sentry. Settings.from_env reads backend/.env, and importing app.main (just
+# below) builds the app from it, so a SENTRY_DSN there would send every error the tests provoke
+# (fake 500s, fake secrets) to the real project and email the owner. The real environment wins
+# over .env, and an empty value means no DSN. Must stay above the app imports.
+os.environ["SENTRY_DSN"] = ""
+
 from pathlib import Path
 
 import pytest
@@ -127,3 +134,16 @@ def contract_schema(tmp_path_factory):
         headers={"Authorization": f"Bearer {make_token(lifetime=24 * 3600)}"},
     )
     return schema
+
+
+@pytest.fixture(autouse=True)
+def _sentry_stays_off():
+    """Fail loudly if anything pointed Sentry at a real project in a test: its alerts would reach the real inbox.
+
+    tests/test_monitoring.py turns it on with a capturing transport, inside its own fixture.
+    """
+    import sentry_sdk
+
+    # A DSN is what lets events leave; a client re-initialised without one (test_monitoring does) is harmless.
+    assert not sentry_sdk.get_client().dsn, "Sentry has a DSN during a test: check SENTRY_DSN handling in tests/conftest.py"
+    yield

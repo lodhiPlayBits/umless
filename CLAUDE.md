@@ -100,6 +100,7 @@ Ports: your dev servers use 8000 and 5173; e2e uses 8766 and 5175; manual checks
 - The kit policy hook blocks piping `curl` into an interpreter. Write to a file, or print the raw output.
 - Line endings are mixed (CRLF and LF) and there's no `.gitattributes` yet; keep each file's existing endings when editing.
 - Chrome's WebM recordings have no duration metadata; the UI shows the measured take length instead.
+- Tests read `backend/.env` too (importing `app.main` builds the app from it), so `tests/conftest.py` sets `SENTRY_DSN` to empty first and an autouse guard fails any test that finds a DSN. Without that, every provoked 500 in a test run emailed the owner through the real Sentry project (2026-11-03). Never mount `backend/.env` into a throwaway container read-write for experiments either.
 
 ## Open items
 
