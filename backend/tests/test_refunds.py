@@ -30,7 +30,7 @@ from app.billing.sql import SqlBillingStore
 from app.billing.store import PAID_AT_FORMAT, utc_now
 from app.config import Settings
 from app.main import create_app
-from tests.test_billing import KEY_SECRET, FakeRazorpay, account, captured, metered_app, pay, transcribe, use_up_free, validate, webhook
+from tests.test_billing import KEY_SECRET, SESSION_1_PAISE, FakeRazorpay, account, captured, metered_app, pay, transcribe, use_up_free, validate, webhook
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ def test_an_unused_pack_is_refundable_and_the_refund_takes_the_time_back(client,
     validate(contract_schema, "requestRefund", response)
     assert (response.json()["status"], response.json()["refundable"]) == ("refund_pending", False)
     assert account(client)["seconds_left"] == 0
-    assert razorpay.refunds == [(f"pay_{order['order_id']}", 4900, {"order_id": order["order_id"], "user_id": "local"})]
+    assert razorpay.refunds == [(f"pay_{order['order_id']}", SESSION_1_PAISE, {"order_id": order["order_id"], "user_id": "local"})]
     [listed] = purchases(client)
     assert (listed["status"], listed["refundable"]) == ("refund_pending", False)
     validate(contract_schema, "listPurchases", client.get("/api/payments"))
@@ -188,19 +188,19 @@ def test_refund_processed_marks_a_pending_refund_refunded(client):
     order, _ = pay(client)
     refund(client, order["order_id"])
 
-    assert webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4900)).json() == {"status": "ok"}
+    assert webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", SESSION_1_PAISE)).json() == {"status": "ok"}
 
     assert purchases(client)[0]["status"] == "refunded"
     assert account(client)["seconds_left"] == 0
     # A repeat delivery changes nothing.
-    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4900))
+    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", SESSION_1_PAISE))
     assert account(client)["seconds_left"] == 0
 
 
 def test_a_refund_made_in_razorpays_dashboard_takes_the_time_back(client):
     order, _ = pay(client)
 
-    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4900))
+    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", SESSION_1_PAISE))
 
     assert purchases(client)[0]["status"] == "refunded"
     assert account(client)["seconds_left"] == 0
@@ -210,7 +210,7 @@ def test_refund_failed_puts_the_time_back(client, caplog):
     order, _ = pay(client)
     refund(client, order["order_id"])
 
-    webhook(client, refund_event("refund.failed", f"pay_{order['order_id']}", 4900))
+    webhook(client, refund_event("refund.failed", f"pay_{order['order_id']}", SESSION_1_PAISE))
 
     assert purchases(client)[0]["status"] == "paid"
     assert account(client)["seconds_left"] == 3600
@@ -230,9 +230,9 @@ def test_partial_or_unknown_refunds_are_left_alone(client):
 def test_a_late_payment_webhook_after_a_refund_credits_nothing(client):
     order, _ = pay(client)
     refund(client, order["order_id"])
-    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", 4900))
+    webhook(client, refund_event("refund.processed", f"pay_{order['order_id']}", SESSION_1_PAISE))
 
-    webhook(client, captured(order["order_id"], 4900, payment_id=f"pay_{order['order_id']}"))
+    webhook(client, captured(order["order_id"], SESSION_1_PAISE, payment_id=f"pay_{order['order_id']}"))
 
     assert (purchases(client)[0]["status"], account(client)["seconds_left"]) == ("refunded", 0)
 

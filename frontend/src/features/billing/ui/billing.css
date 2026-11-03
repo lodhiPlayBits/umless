@@ -8,6 +8,7 @@
 .billing__ribbon.ui-badge { position: absolute; top: -12px; left: var(--space-5); background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
 .billing__pack-name { font-size: var(--text-lg); line-height: var(--leading-lg); }
 .billing__price { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing: -0.03em; }
+.billing__was { margin-left: var(--space-2); font-size: var(--text-md); line-height: var(--leading-md); font-weight: 400; letter-spacing: 0; color: var(--color-text-muted); }
 .billing__pack .ui-button { margin-top: var(--space-2); }
 .billing__note { font-size: var(--text-sm); line-height: var(--leading-sm); }
 .billing__purchases code { font-size: var(--text-xs); }

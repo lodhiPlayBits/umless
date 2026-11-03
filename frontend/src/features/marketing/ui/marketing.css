@@ -69,6 +69,7 @@
 .mk-plan--featured { border: 2px solid var(--color-primary); box-shadow: var(--shadow-md); }
 .mk-plan__ribbon.ui-badge { position: absolute; top: -13px; left: var(--space-6); background: var(--color-primary); color: var(--color-on-primary); border-color: transparent; }
 .mk-plan__price { font-size: 44px; line-height: 52px; font-weight: 700; letter-spacing: -0.03em; }
+.mk-plan__was { margin-left: var(--space-2); font-size: var(--text-md); line-height: var(--leading-md); font-weight: 400; letter-spacing: 0; color: var(--color-text-muted); }
 .mk-table-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
 .mk-table-wrap:focus-visible { outline: 2px solid var(--color-primary); }
 .mk-compare { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 15px; }

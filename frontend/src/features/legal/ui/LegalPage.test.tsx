@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { BUSINESS, LEGAL_PAGES } from '@/content/business'
+import { BUSINESS, LEGAL_PAGES, PRICING } from '@/content/business'
 import LegalPage from './LegalPage'
 
 describe('LegalPage', () => {
@@ -13,8 +13,7 @@ describe('LegalPage', () => {
 
   it('states the prices on the terms and contact pages', () => {
     render(<LegalPage page="terms" />)
-    expect(screen.getByText(/60 minutes of recording time for ₹49/)).toBeInTheDocument()
-    expect(screen.getByText(/300 minutes of recording time for ₹199/)).toBeInTheDocument()
+    for (const pack of PRICING.packs) expect(screen.getByText(new RegExp(`${pack.time} for ${pack.price}`))).toBeInTheDocument()
   })
 
   it('states the 3-day refund rule and that any use ends it', () => {

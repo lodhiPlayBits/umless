@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { FREE_MINUTES, PRICING } from '@/content/business'
+import { FREE_MINUTES, LAUNCH_OFFER, OFFER_LABEL, PRICING } from '@/content/business'
 import { FAQ, pricingRows } from '@/content/marketing'
 import { SessionContext } from '@/shared/lib/session'
 import type { Session } from '@/shared/lib/session'
@@ -25,6 +25,20 @@ describe('PricingCards', () => {
     for (const pack of PRICING.packs) expect(screen.getByText(pack.price)).toBeInTheDocument()
   })
 
+  it('shows the launch offer: the normal price crossed out, and the offer label on the packs and the free plan', () => {
+    render(as('signedOut', <PricingCards />))
+    if (!LAUNCH_OFFER) {
+      expect(screen.queryByText(OFFER_LABEL)).not.toBeInTheDocument()
+      return
+    }
+    for (const pack of PRICING.packs) {
+      const card = screen.getByRole('article', { name: pack.name.replace(/^\w/, (c) => c.toUpperCase()) })
+      expect(within(card).getByText(pack.wasPrice!).tagName).toBe('DEL')
+      expect(within(card).getByText(OFFER_LABEL)).toBeInTheDocument()
+    }
+    expect(within(screen.getByRole('article', { name: 'Free' })).getByText('Launch offer')).toBeInTheDocument()
+  })
+
   it('marks the cheapest per minute as best value', () => {
     render(as('signedOut', <PricingCards />))
     const best = PRICING.packs.reduce((a, b) => (b.rupees / b.minutes < a.rupees / a.minutes ? b : a))
@@ -46,8 +60,10 @@ describe('CompareTable', () => {
     render(<CompareTable />)
     expect(screen.getAllByRole('columnheader')).toHaveLength(2 + PRICING.packs.length)
     const row = screen.getByRole('row', { name: /Cost per minute/ })
-    expect(within(row).getByText('₹0.82 / min')).toBeInTheDocument()
-    expect(within(row).getByText('₹0.66 / min')).toBeInTheDocument()
+    // Launch offer: ₹29 / 60 min and ₹119 / 300 min. Normal: ₹49 and ₹199.
+    const [one, five] = LAUNCH_OFFER ? ['₹0.48 / min', '₹0.40 / min'] : ['₹0.82 / min', '₹0.66 / min']
+    expect(within(row).getByText(one)).toBeInTheDocument()
+    expect(within(row).getByText(five)).toBeInTheDocument()
   })
 
   it('every row has a cell for free and each pack', () => {

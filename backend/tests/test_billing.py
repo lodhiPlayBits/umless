@@ -8,7 +8,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.billing.packs import FREE_SECONDS, PACKS
+from app.billing.packs import FREE_SECONDS, LAUNCH_OFFER, PACKS
 from app.billing.razorpay import Razorpay, RazorpayError
 from app.billing.sql import SqlBillingStore
 from app.billing.store import Balance, InMemoryBillingStore, Order, charged_seconds
@@ -21,6 +21,10 @@ from tests.auth_tokens import make_token, require_sign_in
 AUDIO = b"\x00\x01fake-audio-bytes\xff"
 KEY_SECRET = "test-key-secret"
 WEBHOOK_SECRET = "test-webhook-secret"
+# What the server charges now (launch offer or normal): tests follow the price list, and
+# test_the_account_lists_the_packs pins both price sets.
+SESSION_1_PAISE = PACKS["session_1"].amount_paise
+SESSION_5_PAISE = PACKS["session_5"].amount_paise
 FAKE_SECONDS = 4  # the fake transcript lasts 3.5 s, charged rounded up
 
 
@@ -143,9 +147,12 @@ def test_a_new_account_has_the_free_minutes_and_the_packs(client, contract_schem
     validate(contract_schema, "getAccount", response)
     body = response.json()
     assert (body["metered"], body["free_seconds_left"], body["seconds_left"]) == (True, FREE_SECONDS, 0)
+    # Launch offer: ₹29 / ₹119 and 60 free minutes (40% off). Normal: ₹49 / ₹199 and 20 minutes.
+    prices = (2900, 11900) if LAUNCH_OFFER else (4900, 19900)
+    assert FREE_SECONDS == (3600 if LAUNCH_OFFER else 1200)
     assert [(p["id"], p["seconds"], p["amount_paise"]) for p in body["packs"]] == [
-        ("session_1", 3600, 4900),
-        ("session_5", 18000, 19900),
+        ("session_1", 3600, prices[0]),
+        ("session_5", 18000, prices[1]),
     ]
 
 
@@ -212,9 +219,9 @@ def test_creating_an_order_uses_the_server_price(client, contract_schema):
     assert response.status_code == 201
     validate(contract_schema, "createPaymentOrder", response)
     body = response.json()
-    assert (body["amount_paise"], body["currency"], body["key_id"]) == (19900, "INR", "rzp_test_key")
+    assert (body["amount_paise"], body["currency"], body["key_id"]) == (SESSION_5_PAISE, "INR", "rzp_test_key")
     [sent] = client.app.state.razorpay.orders
-    assert sent["amount"] == 19900
+    assert sent["amount"] == SESSION_5_PAISE
     assert sent["notes"]["pack_id"] == "session_5"
 
 
@@ -339,14 +346,14 @@ def test_a_paid_order_is_listed_as_a_purchase_with_its_receipt_id(client, contra
     assert purchase["order_id"] == order["order_id"]
     assert purchase["payment_id"] == f"pay_{order['order_id']}"
     assert purchase["label"] == "1 session · 60 minutes"
-    assert (purchase["seconds"], purchase["amount_paise"], purchase["currency"]) == (3600, 4900, "INR")
+    assert (purchase["seconds"], purchase["amount_paise"], purchase["currency"]) == (3600, SESSION_1_PAISE, "INR")
     assert purchase["paid_at"].endswith("Z")
 
 
 def test_purchases_are_newest_first_and_include_webhook_credits(client):
     first, _ = pay(client, "session_1")
     second = client.post("/api/payments/orders", json={"pack_id": "session_5"}).json()
-    webhook(client, captured(second["order_id"], 19900, payment_id="pay_hook"))
+    webhook(client, captured(second["order_id"], SESSION_5_PAISE, payment_id="pay_hook"))
 
     items = client.get("/api/payments").json()["items"]
     assert [p["order_id"] for p in items] == [second["order_id"], first["order_id"]]
@@ -377,7 +384,7 @@ def test_without_razorpay_there_are_no_purchases(tmp_path, contract_schema):
 def test_the_webhook_credits_an_order_the_browser_never_verified(client, contract_schema):
     order = client.post("/api/payments/orders", json={"pack_id": "session_1"}).json()
 
-    response = webhook(client, captured(order["order_id"], 4900))
+    response = webhook(client, captured(order["order_id"], SESSION_1_PAISE))
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -387,8 +394,8 @@ def test_the_webhook_credits_an_order_the_browser_never_verified(client, contrac
 
 def test_webhook_and_verify_together_credit_once(client):
     order, _ = pay(client)
-    webhook(client, captured(order["order_id"], 4900))
-    webhook(client, {**captured(order["order_id"], 4900), "event": "order.paid"})
+    webhook(client, captured(order["order_id"], SESSION_1_PAISE))
+    webhook(client, {**captured(order["order_id"], SESSION_1_PAISE), "event": "order.paid"})
 
     assert account(client)["seconds_left"] == 3600
 
@@ -398,12 +405,12 @@ def test_the_webhook_needs_razorpays_signature_not_a_sign_in(tmp_path, contract_
         alice = {"Authorization": f"Bearer {make_token('user_alice')}"}
         order = c.post("/api/payments/orders", json={"pack_id": "session_1"}, headers=alice).json()
 
-        forged = webhook(c, captured(order["order_id"], 4900), secret="guessed")
+        forged = webhook(c, captured(order["order_id"], SESSION_1_PAISE), secret="guessed")
         assert forged.status_code == 400
         validate(contract_schema, "razorpayWebhook", forged)
         assert account(c, alice)["seconds_left"] == 0
 
-        assert webhook(c, captured(order["order_id"], 4900)).status_code == 200
+        assert webhook(c, captured(order["order_id"], SESSION_1_PAISE)).status_code == 200
         assert account(c, alice)["seconds_left"] == 3600
 
 
@@ -552,10 +559,13 @@ def test_a_database_without_razorpay_is_refused(monkeypatch):
 
 
 def test_the_packs_are_the_agreed_prices():
-    assert {p.id: (p.seconds // 60, p.amount_paise // 100) for p in PACKS.values()} == {
-        "session_1": (60, 49),
-        "session_5": (300, 199),
-    }
+    # Normal ₹49 / ₹199; launch offer (2026-11-03) ₹29 / ₹119, which is 40% off.
+    offer = {"session_1": (60, 29), "session_5": (300, 119)}
+    normal = {"session_1": (60, 49), "session_5": (300, 199)}
+    assert {p.id: (p.seconds // 60, p.amount_paise // 100) for p in PACKS.values()} == (offer if LAUNCH_OFFER else normal)
+    # The offer really is about 40% off (the pricing pages say so).
+    for pack_id, (_, rupees) in offer.items():
+        assert 0.39 < 1 - rupees / normal[pack_id][1] < 0.41
 
 
 # --- confirming a payment with Razorpay --------------------------------------------------

@@ -48,7 +48,7 @@ def set_balance(client, free, paid=0):
     store._balances[USER] = replace(store.balance(USER), free_seconds_left=free, seconds_left=paid)
 
 
-def test_a_new_account_has_20_free_minutes(tmp_path):
+def test_a_new_account_starts_with_the_free_minutes(tmp_path):
     client, _ = client_for(tmp_path, 10)
     with client:
         assert (account(client)["free_seconds_left"], account(client)["seconds_left"]) == (FREE_SECONDS, 0)
@@ -236,7 +236,7 @@ def test_migrations_0007_and_0008_convert_then_cap_free_time(mysql_engine):
         with mysql_engine.begin() as conn:
             assert dict(conn.execute(text("SELECT user_id, free_seconds_left FROM accounts WHERE user_id LIKE 'mig_%'")).all()) == {"mig_three": 5400, "mig_none": 0}
             conn.execute(text("INSERT INTO accounts (user_id, free_transcriptions_left, free_seconds_left, seconds_left, created_at) VALUES ('mig_some', 0, 600, 0, NOW())"))
-        command.upgrade(config, "head")
+        command.upgrade(config, "0008")
         with mysql_engine.connect() as conn:
             rows = dict(conn.execute(text("SELECT user_id, free_seconds_left FROM accounts WHERE user_id LIKE 'mig_%'")).all())
         assert rows == {"mig_three": 1200, "mig_none": 0, "mig_some": 600}
@@ -244,3 +244,29 @@ def test_migrations_0007_and_0008_convert_then_cap_free_time(mysql_engine):
         command.upgrade(config, "head")
         with mysql_engine.begin() as conn:
             conn.execute(text("DELETE FROM accounts WHERE user_id LIKE 'mig_%'"))
+
+
+def test_migration_0009_tops_every_account_up_to_60_free_minutes(mysql_engine):
+    # The launch offer (2026-11-03): up to 60 free minutes for everyone; paid time and larger balances untouched.
+    from alembic import command
+    from sqlalchemy import text
+
+    from tests.conftest import alembic_config
+
+    config = alembic_config(mysql_engine.url)
+    command.downgrade(config, "0008")
+    try:
+        with mysql_engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO accounts (user_id, free_transcriptions_left, free_seconds_left, seconds_left, created_at) VALUES "
+                "('top_used_all', 0, 0, 500, NOW()), ('top_some', 0, 600, 0, NOW()), "
+                "('top_full', 0, 1200, 0, NOW()), ('top_big', 0, 7200, 0, NOW())"
+            ))
+        command.upgrade(config, "0009")
+        with mysql_engine.connect() as conn:
+            rows = {r[0]: (r[1], r[2]) for r in conn.execute(text("SELECT user_id, free_seconds_left, seconds_left FROM accounts WHERE user_id LIKE 'top_%'"))}
+        assert rows == {"top_used_all": (3600, 500), "top_some": (3600, 0), "top_full": (3600, 0), "top_big": (7200, 0)}
+    finally:
+        command.upgrade(config, "head")
+        with mysql_engine.begin() as conn:
+            conn.execute(text("DELETE FROM accounts WHERE user_id LIKE 'top_%'"))

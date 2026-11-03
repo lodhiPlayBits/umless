@@ -33,6 +33,13 @@ beforeEach(() => setAccount(outOfTime))
 afterEach(() => resetAccount())
 
 describe('BuyTime', () => {
+  it('shows the normal price next to the launch-offer price the server charges', () => {
+    setAccount({ ...outOfTime, packs: packs.map((p, i) => ({ ...p, amount_paise: i === 0 ? 2900 : 11900 })) })
+    const s = setup()
+    const buttons = within(s.dialog()).getAllByRole('button').map((b) => b.textContent)
+    expect(buttons).toEqual(['Not now', '1 session · 60 minutes · ₹29 (was ₹49)', '5 sessions · 300 minutes · ₹119 (was ₹199)'])
+  })
+
   it('offers both packs with their prices, and Not now first', () => {
     const s = setup()
     const buttons = within(s.dialog()).getAllByRole('button').map((b) => b.textContent)

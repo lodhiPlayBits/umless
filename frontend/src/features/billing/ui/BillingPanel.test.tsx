@@ -34,6 +34,22 @@ beforeEach(() => {
 })
 
 describe('BillingPanel', () => {
+  it('labels the launch offer and crosses out the normal price, only at the offer prices', async () => {
+    getAccount.mockResolvedValue({ ...account(0, 0), packs: packs.map((p, i) => ({ ...p, amount_paise: i === 0 ? 2900 : 11900 })) })
+    render(<BillingPanel buyPack={vi.fn()} />)
+    await screen.findByText('Best value')
+    expect(screen.getAllByText('Launch offer · 40% off')).toHaveLength(2)
+    expect(screen.getByText('₹49').tagName).toBe('DEL')
+    expect(screen.getByText('₹199').tagName).toBe('DEL')
+  })
+
+  it('claims no offer for prices that are not the offer prices', async () => {
+    getAccount.mockResolvedValue(account(0, 0)) // ₹40 and ₹120
+    render(<BillingPanel buyPack={vi.fn()} />)
+    await screen.findByText('Best value')
+    expect(screen.queryByText('Launch offer · 40% off')).not.toBeInTheDocument()
+  })
+
   it('shows what is left and every pack, the cheaper per minute marked best value', async () => {
     getAccount.mockResolvedValue(account(1800, 0))
     render(<BillingPanel buyPack={vi.fn()} />)

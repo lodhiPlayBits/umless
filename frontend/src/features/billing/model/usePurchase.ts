@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PRICING } from '@/content/business'
 import { ApiError } from '@/shared/api/client'
 import type { Pack } from '../api/billingApi'
 import { formatPracticeTime, setAccount } from './account'
@@ -19,6 +20,15 @@ export function purchaseErrorMessage(error: unknown): string {
 /** "₹40" from a pack's paise. */
 export function packPrice(pack: Pack): string {
   return `₹${pack.amount_paise / 100}`
+}
+
+/**
+ * The normal price to show crossed out during the launch offer, or null. Only when the server's
+ * price is the offer price in content/business.ts, so a discount is never claimed that isn't charged.
+ */
+export function packWasPrice(pack: Pack): string | null {
+  const listed = PRICING.packs.find((p) => p.id === pack.id)
+  return listed?.wasPrice && listed.rupees * 100 === pack.amount_paise ? listed.wasPrice : null
 }
 
 /**

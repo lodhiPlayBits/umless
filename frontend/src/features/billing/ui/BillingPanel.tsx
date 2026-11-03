@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { FREE_MINUTES, LEGAL_PAGES } from '@/content/business'
+import { FREE_MINUTES, LEGAL_PAGES, OFFER_LABEL } from '@/content/business'
 import { Badge, Banner, Button, EmptyState, Link, Panel, Skeleton, Stat, cx } from '@/shared/ui'
 import type { Pack } from '../api/billingApi'
 import { formatPracticeTime, practiceTimeLabel, useAccount } from '../model/account'
 import { buyPack as realBuyPack } from '../model/purchase'
-import { packPrice, usePurchase } from '../model/usePurchase'
+import { packPrice, packWasPrice, usePurchase } from '../model/usePurchase'
 import OutOfTimeBanner from './OutOfTimeBanner'
 import { PATHS } from '@/shared/config/paths'
 import './billing.css'
@@ -89,7 +89,16 @@ export default function BillingPanel({ buyPack = realBuyPack }: { buyPack?: type
             <li key={pack.id} className={cx('billing__pack', pack === best && 'billing__pack--best')}>
               {pack === best && <Badge className="billing__ribbon">Best value</Badge>}
               <strong className="billing__pack-name">{pack.label}</strong>
-              <span className="billing__price">{packPrice(pack)}</span>
+              <span className="billing__price">
+                {packPrice(pack)}
+                {packWasPrice(pack) && (
+                  <del className="billing__was">
+                    <span className="ui-sr-only">Normal price </span>
+                    {packWasPrice(pack)}
+                  </del>
+                )}
+              </span>
+              {packWasPrice(pack) && <Badge>{OFFER_LABEL}</Badge>}
               <span className="muted">
                 {formatPracticeTime(pack.seconds)} of recording time · ₹{(pack.amount_paise / 100 / (pack.seconds / 60)).toFixed(2)} / min
               </span>

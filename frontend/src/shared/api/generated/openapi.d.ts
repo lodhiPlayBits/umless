@@ -198,7 +198,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The signed-in user's practice time and the packs on sale */
+        /**
+         * The signed-in user's practice time and the packs on sale
+         * @description `packs` are the prices charged now. During the launch offer they are 40% off the normal
+         *     prices (₹29 for 1 session and ₹119 for 5 sessions, instead of ₹49 and ₹199); orders already
+         *     paid keep the amount they were paid at.
+         */
         get: operations["getAccount"];
         put?: never;
         post?: never;
@@ -707,14 +712,14 @@ export interface components {
          *           "id": "session_1",
          *           "label": "1 session · 60 minutes",
          *           "seconds": 3600,
-         *           "amount_paise": 4900,
+         *           "amount_paise": 2900,
          *           "currency": "INR"
          *         },
          *         {
          *           "id": "session_5",
          *           "label": "5 sessions · 300 minutes",
          *           "seconds": 18000,
-         *           "amount_paise": 19900,
+         *           "amount_paise": 11900,
          *           "currency": "INR"
          *         }
          *       ]
@@ -723,7 +728,11 @@ export interface components {
         Account: {
             /** @description False on a server without payments (local use); then nothing is counted. */
             metered: boolean;
-            /** @description Free practice time left (every account starts with 1200, i.e. 20 minutes); used before paid time. */
+            /**
+             * @description Free practice time left; used before paid time. Every new account starts with 3600 (60
+             *     minutes) during the launch offer, and 1200 (20 minutes) normally. The offer also topped
+             *     existing accounts up to 3600 once.
+             */
             free_seconds_left: number;
             /** @description Paid practice time left. */
             seconds_left: number;
@@ -741,7 +750,7 @@ export interface components {
          *       "pack_id": "session_1",
          *       "label": "1 session · 60 minutes",
          *       "seconds": 3600,
-         *       "amount_paise": 4900,
+         *       "amount_paise": 2900,
          *       "currency": "INR",
          *       "paid_at": "2026-10-30T08:50:46Z",
          *       "status": "paid",

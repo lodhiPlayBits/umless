@@ -1,7 +1,7 @@
 import ChoiceDialog from '@/shared/ui/ChoiceDialog'
 import { useAccount } from '../model/account'
 import { buyPack as realBuyPack } from '../model/purchase'
-import { packPrice, usePurchase } from '../model/usePurchase'
+import { packPrice, packWasPrice, usePurchase } from '../model/usePurchase'
 
 interface BuyTimeProps {
   /** Called once: with a message after a payment, or null if the user backed out. */
@@ -23,7 +23,7 @@ export default function BuyTime({ onDone, buyPack = realBuyPack }: BuyTimeProps)
       choices={[
         { label: 'Not now', onClick: () => onDone(null) },
         ...packs.map((pack, index) => ({
-          label: `${pack.label} · ${packPrice(pack)}`,
+          label: `${pack.label} · ${packPrice(pack)}${packWasPrice(pack) ? ` (was ${packWasPrice(pack)})` : ''}`,
           style: index === 0 ? ('primary' as const) : undefined,
           onClick: () =>
             void purchase.buy(pack).then((outcome) => {
