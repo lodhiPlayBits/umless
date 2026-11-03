@@ -1,5 +1,5 @@
 import { Badge, Button } from '@/shared/ui'
-import { FREE_MINUTES, OFFER_LABEL } from '@/content/business'
+import { FREE_MINUTES, OFFER_LABEL, TIME_NOTE } from '@/content/business'
 import { practiceTimeLabel, useAccount } from '../model/account'
 import { packWasPrice } from '../model/usePurchase'
 import { useBuyTime } from './useBuyTime'
@@ -37,6 +37,7 @@ export default function PracticeTimeCard({ className }: { className?: string }) 
       <Button size="sm" block onClick={buy.open}>
         Buy time
       </Button>
+      <p className="practice-time-card__note">{TIME_NOTE}</p>
       {buy.ui}
     </div>
   )

@@ -450,3 +450,37 @@ describe('PracticeSession out of practice time', () => {
     expect(transcribe).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('PracticeSession recording limit', () => {
+  afterEach(() => resetAccount())
+
+  it('stops a recording at the practice time left, so every last second can be used', async () => {
+    setAccount({ metered: true, free_seconds_left: 60, seconds_left: 180, packs: [] }) // 4 minutes
+    const s = setup()
+    expect(screen.getByText(/Up to 3:59, the practice time you have left/)).toBeInTheDocument()
+
+    await s.user.click(startBtn())
+    await stopBtn()
+    expect(s.startRecording).toHaveBeenCalledWith(expect.objectContaining({ maxMs: 239_000 }))
+    // The recorder reports hitting that limit like the 10-minute one.
+    act(() => s.autoStop()(audio(), 'limit'))
+    expect(await screen.findByText('Stopped when your practice time ran out')).toBeInTheDocument()
+    expect(screen.getByText(/uses all the time you had left/)).toBeInTheDocument()
+    expect(screen.queryByText('Stopped at the 10-minute limit')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['plenty of time left', { metered: true, free_seconds_left: 3600, seconds_left: 7200, packs: [] }],
+    ['no time left (it can still be recorded, then time bought)', { metered: true, free_seconds_left: 0, seconds_left: 0, packs: [] }],
+    ['nothing metered (local use)', { metered: false, free_seconds_left: 0, seconds_left: 0, packs: [] }],
+  ])('keeps the 10-minute limit with %s', async (_, account) => {
+    setAccount(account)
+    const s = setup()
+    expect(screen.getByText(/Up to 10 minutes/)).toBeInTheDocument()
+    await s.user.click(startBtn())
+    await stopBtn()
+    expect(s.startRecording).toHaveBeenCalledWith(expect.objectContaining({ maxMs: 600_000 }))
+    act(() => s.autoStop()(audio(), 'limit'))
+    expect(await screen.findByText('Stopped at the 10-minute limit')).toBeInTheDocument()
+  })
+})

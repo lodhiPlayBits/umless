@@ -10,6 +10,8 @@ type TakeReviewStageProps = {
   take: Take
   audioUrl: string
   audioName: string
+  /** The recording was capped by the practice time left, not the 10-minute limit. */
+  limitedByTime?: boolean
   onTranscribe: () => void
   onRecordAgain: () => void
   onAudioDownloaded: () => void
@@ -25,7 +27,12 @@ export default function TakeReviewStage(props: TakeReviewStageProps) {
   const length = formatClock(take.recording.durationMs)
   return (
     <>
-      {stage.name === 'review' && stage.notice === 'limit' && <Banner tone="info" title="Stopped at the 10-minute limit" />}
+      {stage.name === 'review' && stage.notice === 'limit' && !props.limitedByTime && <Banner tone="info" title="Stopped at the 10-minute limit" />}
+      {stage.name === 'review' && stage.notice === 'limit' && props.limitedByTime && (
+        <Banner tone="info" title="Stopped when your practice time ran out">
+          This take uses all the time you had left, so it can be transcribed in full. Buy more time to keep practising.
+        </Banner>
+      )}
       {stage.name === 'review' && stage.notice === 'device-lost' && (
         <Banner tone="warning" role="alert" title="Recording stopped: the microphone was disconnected">
           We kept the {length} you recorded.

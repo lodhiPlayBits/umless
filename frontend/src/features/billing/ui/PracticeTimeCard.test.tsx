@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { LAUNCH_OFFER, OFFER_LABEL, PRICING } from '@/content/business'
+import { LAUNCH_OFFER, OFFER_LABEL, PRICING, TIME_NOTE } from '@/content/business'
 import type { Account } from '../api/billingApi'
 import { resetAccount, setAccount } from '../model/account'
 import PracticeTimeCard from './PracticeTimeCard'
@@ -30,5 +30,13 @@ describe('PracticeTimeCard', () => {
     setAccount(account([4000, 12000]))
     render(<PracticeTimeCard />)
     expect(screen.queryByText(OFFER_LABEL)).not.toBeInTheDocument()
+  })
+})
+
+describe('PracticeTimeCard note', () => {
+  it('says in one line how practice time can be used', () => {
+    setAccount(account([4000, 12000]))
+    render(<PracticeTimeCard />)
+    expect(screen.getByText(TIME_NOTE)).toBeInTheDocument()
   })
 })

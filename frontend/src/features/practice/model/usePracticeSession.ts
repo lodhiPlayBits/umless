@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { refreshAccountIfShown } from '@/features/billing'
+import { refreshAccountIfShown, useAccount } from '@/features/billing'
 import { invalidateTakes } from '@/features/takes'
 import { ApiError } from '@/shared/api/client'
 import { baseFileName } from '@/shared/lib/filenames'
@@ -10,6 +10,7 @@ import { transcribeFailure, transcribeRecording as realTranscribe } from '../api
 import type { PracticeQuestion } from '../api/practiceApi'
 import { initialStage, practiceReducer, takeOf } from './practiceMachine'
 import { RecorderError, extensionFor, isRecordingSupported, startRecording as realStartRecording } from './recorder'
+import { recordingLimitMs } from './recordingLimit'
 import type { AutoStopReason, RecorderHandle, Recording } from './recorder'
 
 /** The browser's permission prompt is only explained if it hasn't answered by then (F3.2). */
@@ -48,6 +49,11 @@ export function usePracticeSession(practice: PracticeQuestion, deps: PracticeDep
   const [audioDownloaded, setAudioDownloaded] = useState(false)
   const [transcriptDownloaded, setTranscriptDownloaded] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
+  // Recordings stop at the practice time left (see recordingLimit.ts). The value a recording started
+  // with is kept while it runs and in its review, even if the balance is refetched meanwhile.
+  const { account } = useAccount()
+  const liveLimitMs = recordingLimitMs(account)
+  const [startedLimitMs, setStartedLimitMs] = useState<number | null>(null)
   const handleRef = useRef<RecorderHandle | null>(null)
   const stoppingRef = useRef(false)
   const mountedRef = useRef(true)
@@ -97,7 +103,11 @@ export function usePracticeSession(practice: PracticeQuestion, deps: PracticeDep
     dispatch({ type: 'requestMic' })
     const hint = window.setTimeout(() => dispatch({ type: 'permissionSlow' }), PERMISSION_HINT_MS)
     try {
-      const handle = await startRecording({ onAutoStop: (recording, reason) => finish(recording, reason ?? 'device-lost') })
+      setStartedLimitMs(liveLimitMs)
+      const handle = await startRecording({
+        maxMs: liveLimitMs,
+        onAutoStop: (recording, reason) => finish(recording, reason ?? 'device-lost'),
+      })
       if (!mountedRef.current) {
         void handle.stop()
         return
@@ -214,6 +224,8 @@ export function usePracticeSession(practice: PracticeQuestion, deps: PracticeDep
     dialog,
     toast,
     readLevel,
+    /** How long a recording may run: 10 minutes, or the practice time left if that's shorter. */
+    limitMs: stage.name === 'ready' ? liveLimitMs : (startedLimitMs ?? liveLimitMs),
     actions: {
       start: () => void start(),
       stop: () => void stop(),

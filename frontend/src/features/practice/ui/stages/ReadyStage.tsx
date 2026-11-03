@@ -1,17 +1,21 @@
 import { Banner, Icon, Kbd } from '@/shared/ui'
 import { PastTakes } from '@/features/takes'
 import type { TakesApi } from '@/features/takes'
+import { formatClock } from '@/shared/lib/timeLabel'
+import { MAX_RECORDING_MS } from '../../model/recorder'
 
 type ReadyStageProps = {
   questionId: string
   question: string
   serverUp: boolean | null
   takes?: TakesApi
+  /** How long a recording may run; under 10 minutes when the practice time left is shorter. */
+  limitMs?: number
   onStart: () => void
 }
 
 /** F3.1: the big record button, what happens to the recording, and this question's past takes. */
-export default function ReadyStage({ questionId, question, serverUp, takes, onStart }: ReadyStageProps) {
+export default function ReadyStage({ questionId, question, serverUp, takes, limitMs = MAX_RECORDING_MS, onStart }: ReadyStageProps) {
   return (
     <>
       <p className="practice-lead">
@@ -25,7 +29,8 @@ export default function ReadyStage({ questionId, question, serverUp, takes, onSt
           Start
         </strong>
         <p className="practice-stage__hint">
-          Up to 10 minutes · Press <Kbd>Space</Kbd> to start
+          {limitMs < MAX_RECORDING_MS ? `Up to ${formatClock(limitMs)}, the practice time you have left` : 'Up to 10 minutes'} · Press{' '}
+          <Kbd>Space</Kbd> to start
         </p>
       </section>
       <p className="practice-note">

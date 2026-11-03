@@ -4,6 +4,7 @@ import Toast from '@/shared/ui/Toast'
 import type { PracticeQuestion } from '../api/practiceApi'
 import type { TakesApi } from '@/features/takes'
 import { usePracticeSession } from '../model/usePracticeSession'
+import { limitedByTimeLeft } from '../model/recordingLimit'
 import type { PracticeDeps } from '../model/usePracticeSession'
 import PracticeDialogs from './PracticeDialogs'
 import PracticeHeader from './PracticeHeader'
@@ -45,13 +46,26 @@ export default function PracticeSession({ practice, serverUp, takes, ...deps }: 
       />
 
       {stage.name === 'ready' && (
-        <ReadyStage questionId={practice.question.id} question={session.question} serverUp={serverUp} takes={takes} onStart={actions.start} />
+        <ReadyStage
+          questionId={practice.question.id}
+          question={session.question}
+          serverUp={serverUp}
+          takes={takes}
+          limitMs={session.limitMs}
+          onStart={actions.start}
+        />
       )}
       {stage.name === 'requesting' && <PermissionStage showHint={stage.showHint} />}
       {stage.name === 'mic-error' && <MicErrorStage kind={stage.kind} message={stage.message} onRetry={actions.start} />}
       {stage.name === 'unsupported' && <UnsupportedStage />}
       {stage.name === 'recording' && (
-        <RecordingStage startedAt={stage.startedAt} level={session.readLevel} onStop={actions.stop} onCancel={actions.cancelTake} />
+        <RecordingStage
+          startedAt={stage.startedAt}
+          level={session.readLevel}
+          maxMs={session.limitMs}
+          onStop={actions.stop}
+          onCancel={actions.cancelTake}
+        />
       )}
       {stage.name === 'empty' && <NothingRecordedStage onRecordAgain={actions.reset} />}
       {take && audioUrl && (stage.name === 'review' || stage.name === 'transcribing' || stage.name === 'transcribe-error') && (
@@ -60,6 +74,7 @@ export default function PracticeSession({ practice, serverUp, takes, ...deps }: 
           take={take}
           audioUrl={audioUrl}
           audioName={session.audioName}
+          limitedByTime={limitedByTimeLeft(session.limitMs)}
           onTranscribe={actions.transcribe}
           onRecordAgain={actions.recordAgain}
           onAudioDownloaded={actions.audioDownloaded}

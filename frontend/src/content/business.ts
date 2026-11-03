@@ -18,6 +18,9 @@ export const LAST_UPDATED = '3 November 2026'
 export const LAUNCH_OFFER = true
 export const OFFER_LABEL = 'Launch offer · 40% off'
 
+/** What practice time is, in one line: shown on the sidebar card (the dashboard and every signed-in page). */
+export const TIME_NOTE = 'Use it however you like. Counted by the second, never expires.'
+
 /**
  * The prices, in words. The server's price list (backend/app/billing/packs.py) is what's
  * charged; keep this in step with it.
