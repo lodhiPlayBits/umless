@@ -1,6 +1,7 @@
-import { Button } from '@/shared/ui'
-import { FREE_MINUTES } from '@/content/business'
+import { Badge, Button } from '@/shared/ui'
+import { FREE_MINUTES, OFFER_LABEL } from '@/content/business'
 import { practiceTimeLabel, useAccount } from '../model/account'
+import { packWasPrice } from '../model/usePurchase'
 import { useBuyTime } from './useBuyTime'
 import './PracticeTimeCard.css'
 
@@ -31,6 +32,8 @@ export default function PracticeTimeCard({ className }: { className?: string }) 
           <span style={{ width: `${(free / freeMax) * 100}%` }} />
         </div>
       )}
+      {/* Only while the server really charges the offer prices. */}
+      {account.packs.some((pack) => packWasPrice(pack)) && <Badge>{OFFER_LABEL}</Badge>}
       <Button size="sm" block onClick={buy.open}>
         Buy time
       </Button>
